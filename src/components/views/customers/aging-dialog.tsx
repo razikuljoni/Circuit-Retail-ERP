@@ -1,8 +1,8 @@
 'use client'
 
 // Receivables aging report dialog — buckets outstanding dues by invoice age.
-import { AlarmClock, Loader2, Wallet } from 'lucide-react'
-import { fmtDateTime, fmtMoney } from '@/lib/format'
+import { AlarmClock, Loader2, Printer, Wallet } from 'lucide-react'
+import { currencySymbol, fmtDateTime, fmtMoney } from '@/lib/format'
 import type { AgingReport } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { EmptyState } from '@/components/shared/page-bits'
+import { useUiStore } from '@/store/ui'
 
 function cell(v: number): React.ReactNode {
   return v > 0 ? (
@@ -34,10 +35,19 @@ function cell(v: number): React.ReactNode {
 
 export function AgingDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data, loading, error } = useApi<AgingReport>(open ? '/api/customers/aging' : null)
+  const storeName = useUiStore((s) => s.settings?.storeName ?? 'Circuit Store')
+  const symbol = currencySymbol()
+
+  const print = () => {
+    document.body.classList.add('printing-report')
+    window.print()
+    setTimeout(() => document.body.classList.remove('printing-report'), 500)
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-hidden flex flex-col">
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlarmClock className="size-4.5 text-primary" />
@@ -63,7 +73,7 @@ export function AgingDialog({ open, onClose }: { open: boolean; onClose: () => v
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold">
+              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold shadow-sm">
                 Total due {fmtMoney(data.totalDue)}
               </Badge>
               <Badge variant="secondary">
@@ -80,9 +90,9 @@ export function AgingDialog({ open, onClose }: { open: boolean; onClose: () => v
                   <TableRow>
                     <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Current ≤30</TableHead>
-                    <TableHead className="text-right">31–60</TableHead>
-                    <TableHead className="text-right">61–90</TableHead>
-                    <TableHead className="text-right">90+</TableHead>
+                    <TableHead className="text-right text-amber-600 dark:text-amber-400/90">31–60</TableHead>
+                    <TableHead className="text-right text-orange-600 dark:text-orange-400/90">61–90</TableHead>
+                    <TableHead className="text-right text-red-600 dark:text-red-400/90">90+</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Oldest</TableHead>
                   </TableRow>
@@ -110,12 +120,75 @@ export function AgingDialog({ open, onClose }: { open: boolean; onClose: () => v
           </>
         )}
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {data && data.rows.length > 0 && (
+            <Button variant="outline" size="sm" className="h-9 mr-auto" onClick={print}>
+              <Printer className="size-3.5" aria-hidden /> Print aging report
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </div>
       </DialogContent>
     </Dialog>
+      {/* Hidden A4 print clone */}
+      {data && data.rows.length > 0 && (
+        <div className="report-print-area" style={{ display: 'none' }} aria-hidden>
+          <div style={{ textAlign: 'center', marginBottom: 14 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '0.02em' }}>{storeName}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, marginTop: 2 }}>Receivables Aging Report</div>
+            <div style={{ fontSize: 10.5, color: '#475569' }}>
+              as of {fmtDateTime(data.generatedAt)} (Asia/Dhaka) · {data.customersWithDues} customer
+              {data.customersWithDues === 1 ? '' : 's'} with dues
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th className="num">Current ≤30</th>
+                <th className="num">31–60</th>
+                <th className="num">61–90</th>
+                <th className="num">90+</th>
+                <th className="num">Total</th>
+                <th className="num">Oldest</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <tr key={r.customerId}>
+                  <td>
+                    {r.name}
+                    {r.phone ? <span style={{ color: '#64748b' }}> · {r.phone}</span> : null}
+                  </td>
+                  <td className="num">{r.buckets.c30 > 0 ? fmtMoney(r.buckets.c30) : '—'}</td>
+                  <td className="num">{r.buckets.c60 > 0 ? fmtMoney(r.buckets.c60) : '—'}</td>
+                  <td className="num">{r.buckets.c90 > 0 ? fmtMoney(r.buckets.c90) : '—'}</td>
+                  <td className="num">{r.buckets.c90plus > 0 ? fmtMoney(r.buckets.c90plus) : '—'}</td>
+                  <td className="num">{fmtMoney(r.totalDue)}</td>
+                  <td className="num">{r.oldestDays === 0 ? 'today' : `${r.oldestDays}d`}</td>
+                </tr>
+              ))}
+              <tr className="rep-total">
+                <td>Total due</td>
+                <td className="num">{fmtMoney(data.rows.reduce((s, r) => s + r.buckets.c30, 0))}</td>
+                <td className="num">{fmtMoney(data.rows.reduce((s, r) => s + r.buckets.c60, 0))}</td>
+                <td className="num">{fmtMoney(data.rows.reduce((s, r) => s + r.buckets.c90, 0))}</td>
+                <td className="num">{fmtMoney(data.rows.reduce((s, r) => s + r.buckets.c90plus, 0))}</td>
+                <td className="num">{fmtMoney(data.totalDue)}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+
+          <div style={{ marginTop: 16, fontSize: 9.5, color: '#64748b', textAlign: 'center' }}>
+            Figures in {symbol} · Outstanding = Σ(invoice total − paid) across completed credit sales ·
+            Buckets age from invoice date in Asia/Dhaka.
+          </div>
+        </div>
+      )}
+    </>
   )
 }

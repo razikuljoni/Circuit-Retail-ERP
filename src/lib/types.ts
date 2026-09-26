@@ -338,3 +338,52 @@ export interface StocktakeResult {
     delta: number
   }[]
 }
+
+// ── Supplier statement (GET /api/suppliers/[id]/statement, additive) ──
+
+export interface SupplierStatementOrder {
+  id: string
+  poNo: string
+  status: PurchaseOrderStatus
+  itemCount: number
+  totalQty: number
+  totalCost: number
+  note?: string | null
+  createdAt: string
+  receivedAt?: string | null
+}
+
+export interface SupplierStatement {
+  supplier: Supplier
+  generatedAt: string
+  portfolio: {
+    count: number
+    archivedCount: number
+    units: number
+    stockCostValue: number
+    stockRetailValue: number
+    lowStock: number
+    topProducts: {
+      name: string
+      sku: string
+      unit: string
+      stock: number
+      costPrice: number
+      price: number
+      stockCostValue: number
+    }[]
+  }
+  poStats: {
+    total: number
+    draft: number
+    ordered: number
+    received: number
+    cancelled: number
+    draftValue: number
+    openValue: number
+    receivedValue: number
+    lastOrderAt: string | null
+    lastReceivedAt: string | null
+  }
+  orders: SupplierStatementOrder[]
+}

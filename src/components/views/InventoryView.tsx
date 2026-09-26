@@ -34,6 +34,7 @@ import { AdjustDialog, type AdjustType } from './inventory/adjust-dialog'
 import { MovementBadge } from './inventory/movement-type'
 import { PurchaseOrdersPanel } from './inventory/purchase-orders'
 import { StocktakeDialog } from './inventory/stocktake-dialog'
+import { ValuationPrintButton } from './inventory/valuation-print'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { downloadMovementsCsv } from './inventory/csv'
 
@@ -166,6 +167,7 @@ export default function InventoryView() {
               <ClipboardCheck className="size-4" />
               <span className="hidden sm:inline">Stocktake</span>
             </Button>
+            <ValuationPrintButton products={products} />
             <Button variant="outline" onClick={() => downloadMovementsCsv(movements)} disabled={movements.length === 0}>
               <Download className="size-4" />
               <span className="hidden sm:inline">Export movements</span>

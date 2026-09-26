@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import {
   CheckCircle2,
   ClipboardCheck,
+  History,
   Loader2,
   PackageSearch,
   Search,
@@ -15,7 +16,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { fmtMoney, fmtQty } from '@/lib/format'
+import { fmtDateTime, fmtMoney, fmtQty } from '@/lib/format'
 import type { Product, StocktakeResult } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,45 @@ import { cn } from '@/lib/utils'
 interface CountRow {
   productId: string
   counted: string // raw input
+}
+
+// In-progress counts survive dialog close/reopen (and page reloads) via
+// localStorage. Stale product ids are harmless — they never match a product.
+const DRAFT_KEY = 'circuit.stocktake.draft.v1'
+
+interface StocktakeDraft {
+  rows: Record<string, string>
+  note: string
+  savedAt: string
+}
+
+function loadDraft(): StocktakeDraft | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw) as StocktakeDraft
+    if (!d || typeof d !== 'object' || typeof d.rows !== 'object') return null
+    return d
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(rows: Record<string, string>, note: string) {
+  try {
+    const d: StocktakeDraft = { rows, note, savedAt: new Date().toISOString() }
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(d))
+  } catch {
+    /* storage full/blocked — persistence is best-effort */
+  }
+}
+
+function clearDraft() {
+  try {
+    window.localStorage.removeItem(DRAFT_KEY)
+  } catch {
+    /* ignore */
+  }
 }
 
 export function StocktakeDialog({
@@ -47,19 +87,41 @@ export function StocktakeDialog({
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<StocktakeResult | null>(null)
+  const [resumed, setResumed] = useState<StocktakeDraft | null>(null)
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  // Fresh state on every open
+  // On open: restore any in-progress draft; otherwise start fresh
   useEffect(() => {
     if (open) {
-      setRows({})
+      const d = loadDraft()
+      const valid = d && Object.keys(d.rows).length > 0 ? d : null
+      setRows(valid?.rows ?? {})
+      setNote(valid?.note ?? '')
+      setResumed(valid)
+      setDraftSavedAt(valid?.savedAt ?? null)
       setSearch('')
       setOnlyChanged(false)
-      setNote('')
       setResult(null)
+      if (valid) {
+        toast.info(`Resumed stocktake draft — ${Object.keys(valid.rows).length} count${Object.keys(valid.rows).length === 1 ? '' : 's'} saved ${fmtDateTime(valid.savedAt)}`)
+      }
       requestAnimationFrame(() => searchRef.current?.focus())
     }
   }, [open])
+
+  // Debounced auto-save while counting
+  useEffect(() => {
+    if (!open || result) return
+    const has = Object.keys(rows).length > 0 || note.trim() !== ''
+    const t = setTimeout(() => {
+      if (has) {
+        saveDraft(rows, note)
+        setDraftSavedAt(new Date().toISOString())
+      }
+    }, 600)
+    return () => clearTimeout(t)
+  }, [rows, note, open, result])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -113,6 +175,9 @@ export function StocktakeDialog({
         note: note.trim() || 'Physical count',
       })
       setResult(res)
+      clearDraft()
+      setResumed(null)
+      setDraftSavedAt(null)
       toast.success(
         `Stocktake saved — ${res.adjusted} item${res.adjusted === 1 ? '' : 's'} corrected, ${res.unchanged} matched`
       )
@@ -182,6 +247,33 @@ export function StocktakeDialog({
           </div>
         ) : (
           <>
+            {/* Draft persistence indicator */}
+            {(resumed || draftSavedAt) && Object.keys(rows).length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                <History className="size-3.5 shrink-0 text-primary" aria-hidden />
+                <span>
+                  Draft auto-saved{draftSavedAt ? ` at ${fmtDateTime(draftSavedAt)}` : ''} ·{' '}
+                  <strong className="text-foreground tabular-nums">{Object.keys(rows).length}</strong>{' '}
+                  count{Object.keys(rows).length === 1 ? '' : 's'} kept if you close or reload
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    setRows({})
+                    setNote('')
+                    clearDraft()
+                    setResumed(null)
+                    setDraftSavedAt(null)
+                  }}
+                  disabled={saving}
+                >
+                  Discard draft
+                </Button>
+              </div>
+            )}
+
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[180px]">
@@ -297,7 +389,11 @@ export function StocktakeDialog({
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => setRows({})}
+                    onClick={() => {
+                      setRows({})
+                      clearDraft()
+                      setDraftSavedAt(null)
+                    }}
                     disabled={saving}
                   >
                     Reset counts

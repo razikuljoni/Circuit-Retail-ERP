@@ -347,3 +347,40 @@ Stage Summary:
 
 Recommended next phase:
 - Inventory valuation print + aging report print (same report-print-area pattern), supplier statement view (PO history per supplier), stocktake session persistence (save in-progress counts), expense attachments, product images, multi-user/auth pass, cashier shift (X-report) tracking
+
+---
+Task ID: 13 (cron round 6)
+Agent: Z (main)
+Task: Status assessment + agent-browser QA + new features (supplier statement, valuation print, aging print, stocktake draft persistence) + styling polish
+
+Work Log — status assessment:
+- Baseline healthy: all 10 views render with 0 console errors (desktop + mobile 390px), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/ (errors only in non-app examples/skills folders), dev.log all 200s
+- POS golden path re-verified live: add-to-cart → Charge enabled with correct total (A4 Paper ৳910)
+- Decision: no bugs found → proceeded with new-feature development per plan backlog
+
+Work Log — new features shipped:
+1. SUPPLIER STATEMENT: new GET /api/suppliers/[id]/statement (read-only additive) — supplied-product portfolio (count/units/stock value at cost & retail/low-stock/top-12 by value), PO stats (total/draft/ordered/received/cancelled counts + draftValue/openValue/receivedValue + last order & last received dates), last 200 POs with item/qty/cost rollups. New SupplierStatement type family in src/lib/types.ts. New suppliers/statement-dialog.tsx: 4 accent-striped stat tiles, status badge row (received value/awaiting/drafts/low stock/margin %), PO history table (sticky header, status badges), top-products chips, "Print statement" button → A4 report-print-area clone (portfolio table + PO table with received/open/total-value footer). Entry: new FileText icon button on every supplier card (between edit & delete). Browser-verified with Dhaka Wholesale Mart (2 draft POs ৳2,210 open value) + API curl for Anwar Trade International (0 POs path)
+2. STOCK VALUATION PRINT: new inventory/valuation-print.tsx — "Valuation" button in Inventory header (hidden when no products). A4 clone: totals (units, value at cost/retail, potential margin %, low/out counts) + full per-product table sorted by value at cost desc (SKU/name/category/stock+unit/cost/price/value) with totals row. Same printing-report body-tag pattern. Browser-verified clone content activates with correct store header
+3. AGING REPORT PRINT: aging-dialog.tsx extended — "Print aging report" button (left-aligned in footer, only when rows exist) + A4 clone with per-customer bucket rows (phone inline), bucket totals row + grand total due. Return converted to fragment to host clone outside Dialog. Browser-verified clone content
+4. STOCKTAKE DRAFT PERSISTENCE: stocktake-dialog.tsx now auto-saves in-progress counts to localStorage (circuit.stocktake.draft.v1, debounced 600ms, rows+note+savedAt, try/catch best-effort). On open: draft restored + toast "Resumed stocktake draft — N counts saved <time>"; dashed indicator bar shows "Draft auto-saved at <time> · N counts kept if you close or reload" with Discard draft button; Reset counts and successful apply both clear the draft; stale product ids in draft are harmless (never match). Browser-verified: count 34 → close → reopen → value restored + indicator shown → Discard cleared
+
+Work Log — styling polish (mandatory):
+- Supplier statement stat tiles: 2.5px top accent stripes (primary/sky/emerald/amber per metric)
+- Aging dialog: bucket column headers now color-coded (amber 31–60, orange 61–90, red 90+) matching body cells; Total-due badge gains shadow
+- Supplier cards: hover:border-primary/30 ring added to existing hover-lift
+- Statement dialog: removed nonexistent styled-scrollbar class (global thin-scrollbar CSS already applies)
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+- agent-browser: 10-view sweep (dashboard/pos/sales/products/inventory/expenses/customers/suppliers/reports/settings) 0 console errors; mobile 390px suppliers shows statement/edit/delete icons cleanly; POS golden path green; print clones verified for valuation + aging + statement; stocktake draft save/resume/discard verified
+- dev.log: all 200s, no compile errors
+- No data mutations this round (all features read-only except stocktake draft which was discarded)
+
+Stage Summary:
+- Backend surface added: GET /api/suppliers/[id]/statement; types: SupplierStatement/SupplierStatementOrder
+- Frontend: statement-dialog.tsx, valuation-print.tsx; aging-dialog + stocktake-dialog extended; SuppliersView statement button
+- All four P&L/valuation/aging/statement reports now print to ink-friendly A4/PDF via one shared CSS pattern
+- Known limitations: statement lists last 200 POs (fine for demo scale); valuation print is A4 (not receipt printer); stocktake draft is per-browser (localStorage), not multi-device
+
+Recommended next phase:
+- X-report (cashier shift close) from Sales view; PO receive with per-line partial quantities; supplier statement email/export; product images; multi-user/auth pass; dashboard auto-refresh indicator polish

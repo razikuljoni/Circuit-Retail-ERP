@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Mail, MapPin, Pencil, Phone, Plus, StickyNote, Trash2, Truck } from 'lucide-react'
+import { FileText, Mail, MapPin, Pencil, Phone, Plus, StickyNote, Trash2, Truck } from 'lucide-react'
 import { api, qs } from '@/lib/api'
 import type { Supplier } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { PageHeader, EmptyState, ErrorState, ViewLoader } from '@/components/shared/page-bits'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { SupplierDialog } from './suppliers/supplier-dialog'
+import { SupplierStatementDialog } from './suppliers/statement-dialog'
 
 export default function SuppliersView() {
   const [search, setSearch] = useState('')
@@ -23,6 +24,13 @@ export default function SuppliersView() {
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const [statementId, setStatementId] = useState<string | null>(null)
+  const [statementName, setStatementName] = useState('')
+
+  function openStatement(s: Supplier) {
+    setStatementId(s.id)
+    setStatementName(s.name)
+  }
 
   function openCreate() {
     setEditing(null)
@@ -98,7 +106,7 @@ export default function SuppliersView() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {suppliers.map((s) => (
-            <Card key={s.id} className="p-4 sm:p-5 flex flex-col gap-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
+            <Card key={s.id} className="p-4 sm:p-5 flex flex-col gap-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold leading-tight truncate" title={s.name}>
@@ -109,6 +117,16 @@ export default function SuppliersView() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    aria-label={`Statement for ${s.name}`}
+                    title="View purchase statement"
+                    onClick={() => openStatement(s)}
+                  >
+                    <FileText className="size-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="size-8" aria-label={`Edit ${s.name}`} onClick={() => openEdit(s)}>
                     <Pencil className="size-3.5" />
                   </Button>
@@ -154,6 +172,12 @@ export default function SuppliersView() {
       )}
 
       <SupplierDialog open={dialogOpen} onOpenChange={setDialogOpen} supplier={editing} onSaved={refetch} />
+
+      <SupplierStatementDialog
+        supplierId={statementId}
+        supplierName={statementName}
+        onClose={() => setStatementId(null)}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
