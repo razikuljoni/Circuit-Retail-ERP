@@ -28,6 +28,7 @@ import { PageHeader, EmptyState, ErrorState, ViewLoader } from '@/components/sha
 import { StatCard } from '@/components/shared/stat-card'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { hashColor } from './products/colors'
+import { ProductAvatar } from '@/components/shared/product-avatar'
 import { downloadProductsCsv } from './products/csv'
 import { useDebouncedValue } from './products/use-debounced-value'
 import { ProductDialog } from './products/product-dialog'
@@ -349,10 +350,23 @@ export default function ProductsView() {
                         <TableRow key={p.id}>
                           <TableCell className="font-mono text-xs whitespace-nowrap">{p.sku}</TableCell>
                           <TableCell>
-                            <div className="font-medium leading-tight max-w-[240px] truncate" title={p.name}>
-                              {p.name}
+                            <div className="flex items-center gap-2">
+                              <ProductAvatar
+                                name={p.name}
+                                sku={p.sku}
+                                imageUrl={p.imageUrl}
+                                className="size-8 rounded-md"
+                                textClassName="text-[11px]"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-medium leading-tight max-w-[240px] truncate" title={p.name}>
+                                  {p.name}
+                                </div>
+                                {p.barcode && (
+                                  <div className="font-mono text-[11px] text-muted-foreground">{p.barcode}</div>
+                                )}
+                              </div>
                             </div>
-                            {p.barcode && <div className="font-mono text-[11px] text-muted-foreground">{p.barcode}</div>}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
                             {p.category ? (

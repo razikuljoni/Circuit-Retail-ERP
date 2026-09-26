@@ -5,7 +5,7 @@
 // `printing-report` while printing) so the same ink-friendly CSS applies.
 import { FileText, Loader2, Printer, Truck } from 'lucide-react'
 import { currencySymbol, fmtDate, fmtDateTime, fmtMoney, fmtQty } from '@/lib/format'
-import type { SupplierStatement } from '@/lib/types'
+import type { SupplierStatement, SupplierStatementOrder } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -114,6 +114,11 @@ export function SupplierStatementDialog({
                     {s.poStats.ordered} awaiting
                   </Badge>
                 )}
+                {s.poStats.partial > 0 && (
+                  <Badge variant="outline" className="border-cyan-500/40 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 tabular-nums">
+                    {s.poStats.partial} partial
+                  </Badge>
+                )}
                 {s.poStats.draft > 0 && (
                   <Badge variant="outline" className="tabular-nums">
                     {s.poStats.draft} draft{s.poStats.draft === 1 ? '' : 's'}
@@ -149,7 +154,7 @@ export function SupplierStatementDialog({
                         <TableHead className="pl-3">PO #</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-center">Items</TableHead>
-                        <TableHead className="text-center">Qty</TableHead>
+                        <TableHead className="min-w-28">Delivery</TableHead>
                         <TableHead className="text-right">Cost</TableHead>
                         <TableHead className="text-right pr-3">Date</TableHead>
                       </TableRow>
@@ -164,8 +169,8 @@ export function SupplierStatementDialog({
                             <PoStatusBadge status={o.status} />
                           </TableCell>
                           <TableCell className="text-center text-sm tabular-nums">{o.itemCount}</TableCell>
-                          <TableCell className="text-center text-sm tabular-nums text-muted-foreground">
-                            {fmtQty(o.totalQty)}
+                          <TableCell>
+                            <DeliveryProgress order={o} />
                           </TableCell>
                           <TableCell className="text-right text-sm font-semibold tabular-nums whitespace-nowrap">
                             {fmtMoney(o.totalCost)}
@@ -257,7 +262,7 @@ export function SupplierStatementDialog({
                 <th style={{ width: '22%' }}>PO #</th>
                 <th style={{ width: '16%' }}>Status</th>
                 <th className="num" style={{ width: '14%' }}>Items</th>
-                <th className="num" style={{ width: '16%' }}>Qty</th>
+                <th className="num" style={{ width: '16%' }}>Delivered</th>
                 <th className="num">Cost</th>
                 <th style={{ width: '14%' }}>Date</th>
               </tr>
@@ -268,7 +273,9 @@ export function SupplierStatementDialog({
                   <td>{o.poNo}</td>
                   <td>{o.status}</td>
                   <td className="num">{o.itemCount}</td>
-                  <td className="num">{o.totalQty}</td>
+                  <td className="num">
+                    {o.receivedQty}/{o.totalQty} units
+                  </td>
                   <td className="num">{fmtMoney(o.totalCost)}</td>
                   <td>{fmtDate(o.createdAt)}</td>
                 </tr>
@@ -288,5 +295,50 @@ export function SupplierStatementDialog({
         </div>
       )}
     </>
+  )
+}
+
+// ── Delivery progress cell — received/ordered units with mini bar ──────────
+function DeliveryProgress({ order: o }: { order: SupplierStatementOrder }) {
+  if (o.status === 'CANCELLED' && o.receivedQty === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>
+  }
+  const pct = Math.min(100, Math.round((o.receivedQty / Math.max(1, o.totalQty)) * 100))
+  return (
+    <div className="min-w-24" title={`${fmtQty(o.receivedQty)} of ${fmtQty(o.totalQty)} units received`}>
+      <div className="flex items-baseline justify-between text-[11px] tabular-nums">
+        <span
+          className={
+            pct >= 100
+              ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+              : pct > 0
+                ? 'font-semibold text-amber-600 dark:text-amber-400'
+                : 'font-semibold text-muted-foreground'
+          }
+        >
+          {pct}%
+        </span>
+        <span className="text-muted-foreground">
+          {fmtQty(o.receivedQty)}/{fmtQty(o.totalQty)}
+        </span>
+      </div>
+      <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={
+            pct >= 100
+              ? 'h-full rounded-full bg-emerald-500 transition-all'
+              : pct > 0
+                ? 'h-full rounded-full bg-amber-500 transition-all'
+                : 'h-full rounded-full bg-transparent'
+          }
+          style={{ width: `${pct}%` }}
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="PO delivery progress"
+        />
+      </div>
+    </div>
   )
 }

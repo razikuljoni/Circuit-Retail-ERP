@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { bad, zodMsg, isUniqueError } from '@/lib/api-utils'
+import { bad, zodMsg, isUniqueError, isValidImageUrl } from '@/lib/api-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +37,13 @@ const putSchema = z.object({
   barcode: z.string().trim().max(60).optional().nullable(),
   name: z.string().trim().min(1, 'Name is required').max(200).optional(),
   description: z.string().max(2000).optional().nullable(),
+  imageUrl: z
+    .string()
+    .trim()
+    .max(300_000)
+    .refine((u) => u === '' || isValidImageUrl(u), 'Image must be an http(s) URL or data:image URI')
+    .optional()
+    .nullable(),
   unit: z.string().trim().max(20).optional(),
   categoryId: z.string().trim().optional().nullable(),
   supplierId: z.string().trim().optional().nullable(),

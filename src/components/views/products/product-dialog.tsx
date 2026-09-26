@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ProductAvatar } from '@/components/shared/product-avatar'
 
 export const PRODUCT_UNITS = ['pcs', 'box', 'kg', 'ltr', 'pack'] as const
 
@@ -48,6 +49,14 @@ const schema = z.object({
     .trim()
     .refine((v) => v === '' || (Number.isFinite(Number(v)) && Number(v) >= 0), 'Enter a valid number'),
   description: z.string().max(2000, 'Max 2000 characters'),
+  imageUrl: z
+    .string()
+    .trim()
+    .max(300_000, 'Image too large (max ~300KB for data URIs)')
+    .refine(
+      (v) => v === '' || /^https?:\/\/.+/i.test(v) || /^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,[\s\S]+$/i.test(v),
+      'Must be an http(s) URL or a data:image URI'
+    ),
   isActive: z.boolean(),
 })
 
@@ -66,6 +75,7 @@ const EMPTY: FormValues = {
   reorderLevel: '5',
   stock: '0',
   description: '',
+  imageUrl: '',
   isActive: true,
 }
 
@@ -120,6 +130,7 @@ export function ProductDialog({
         reorderLevel: String(product.reorderLevel ?? 0),
         stock: String(product.stock ?? 0),
         description: product.description ?? '',
+        imageUrl: product.imageUrl ?? '',
         isActive: product.isActive,
       }
       reset(next)
@@ -153,6 +164,7 @@ export function ProductDialog({
           taxRate: v.taxRate.trim() === '' ? 0 : toNum(v.taxRate),
           reorderLevel: v.reorderLevel.trim() === '' ? 0 : toNum(v.reorderLevel),
           description: v.description.trim() || null,
+          imageUrl: v.imageUrl.trim() || null,
         }
         try {
           if (isEdit && product) {
@@ -304,6 +316,33 @@ export function ProductDialog({
               <Label htmlFor="p-desc">Description</Label>
               <Textarea id="p-desc" rows={3} placeholder="Optional notes about this product" {...register('description')} />
               {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="p-image">Product image URL</Label>
+              <div className="flex items-start gap-3">
+                <ProductAvatar
+                  name={watch('name') || '?'}
+                  imageUrl={watch('imageUrl') || null}
+                  className="size-14 rounded-xl border border-border/60 bg-muted/40"
+                  textClassName="text-base"
+                />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Input
+                    id="p-image"
+                    placeholder="https://… or data:image/png;base64,…"
+                    className="font-mono text-xs"
+                    {...register('imageUrl')}
+                  />
+                  {errors.imageUrl ? (
+                    <p className="text-xs text-destructive">{errors.imageUrl.message}</p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      Shown on POS tiles & product lists — falls back to initials when empty or broken.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
             {isEdit && (

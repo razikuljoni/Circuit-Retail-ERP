@@ -38,6 +38,7 @@ model Product {
   barcode      String?  @unique
   name         String
   description  String?
+  imageUrl     String? // optional product photo (URL or data URI)
   unit         String   @default("pcs") // pcs, kg, ltr, box, pack
   categoryId   String?
   category     Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

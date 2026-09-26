@@ -34,31 +34,12 @@ import { fmtDate, fmtMoney, fmtQty, fmtTime } from '@/lib/format'
 import type { Category, Customer, Product, Sale } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
 import { cartTotals, usePosStore } from '@/store/pos'
-import { hashColor } from './products/colors'
+import { ProductAvatar } from '@/components/shared/product-avatar'
 import { CartPanel } from '@/components/views/sales/cart-panel'
 import { CheckoutDialog } from '@/components/views/sales/checkout-dialog'
 import { ReceiptDialog } from '@/components/views/sales/receipt'
 
 const MAX_RENDER = 60
-
-/** Deterministic gradient tile with product initials — visual anchor per card. */
-function ProductThumb({ product }: { product: Product }) {
-  const color = hashColor(product.categoryId ?? product.sku)
-  const initials = product.name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
-  return (
-    <span
-      aria-hidden
-      className="flex size-10 shrink-0 select-none items-center justify-center rounded-lg text-[13px] font-bold tracking-wide text-white shadow-sm ring-1 ring-black/5"
-      style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}B3 100%)` }}
-    >
-      {initials || '?'}
-    </span>
-  )
-}
 
 /** Stock-depth bar: full = ≥3× reorder level, amber = low, red = out. */
 function StockBar({ product }: { product: Product }) {
@@ -378,7 +359,7 @@ export default function PosView() {
                         )}
                       >
                         <span className="flex items-start gap-2">
-                          <ProductThumb product={p} />
+                          <ProductAvatar name={p.name} sku={p.sku} imageUrl={p.imageUrl} />
                           <span className="min-w-0 flex-1">
                             <span className="line-clamp-2 text-xs font-medium leading-4">{p.name}</span>
                             <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">

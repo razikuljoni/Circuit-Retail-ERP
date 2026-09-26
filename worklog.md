@@ -423,3 +423,43 @@ Stage Summary:
 
 Recommended next phase:
 - Receipt/receive-note printing for partial deliveries (GRN print), supplier statement to include receivedQty line progress, stocktake session persistence server-side, product images upload, multi-user/auth pass, cashier shift (X-report auto-open on POS login) tracking
+
+---
+Task ID: 15 (cron round 8)
+Agent: Z (main)
+Task: Status assessment + agent-browser QA + new features (GRN print, product image URLs with shared avatar component, supplier statement delivery progress) + demo product photos
+
+Work Log — status assessment:
+- Baseline healthy: 10-view sweep 0 console errors (desktop 1280 + mobile 390 spot checks), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s; POS golden path verified (add → ৳560)
+- Decision: no bugs → feature development from worklog backlog (GRN print, supplier statement progress, product images)
+
+Work Log — new features shipped:
+1. GRN (GOODS RECEIVED NOTE) PRINT: new inventory/grn-print.tsx — per-PO A4 receiving document via the shared .report-print-area pattern (body.printing-report). Content: store header, "Goods Received Note (GRN)", PO no + status, supplier + PO date + delivery state (None yet / Partial / Complete + last received date), per-line table (Product/SKU/Ordered/Received/Remaining with amber-when-open or green-when-done tone/Unit cost/Received value), totals row, order vs received value footer, "Received by / Checked by" signature lines, Dhaka timestamp. Entry: printer icon button on PO rows with status ORDERED/PARTIAL/RECEIVED (DRAFT/CANCELLED excluded). Browser-verified: clone for PO-20260927-0006 contains PO no, Totals, signature lines, delivery state; window.print trigger verified (stubbed)
+2. PRODUCT IMAGE URLS + SHARED AVATAR: Prisma Product.imageUrl String? pushed (nullable, additive). New API validation: zod imageUrl in POST/PUT products (http(s) URL or data:image URI, 300KB cap, ''→null) + isValidImageUrl helper in api-utils; PUT flows through via ...data spread. New shared component components/shared/product-avatar.tsx: renders photo when present, onError falls back to deterministic gradient initials tile (same hashColor), size/text via props. Wired into: POS product cards (replaces local ProductThumb), POS cart line items (CartItem gained imageUrl, pos store addItem copies it), products table name cell (new 32px mini avatar beside name), product dialog (new "Product image URL" field with 56px live preview that switches initials→photo as you type). API verified: PUT with 1-3KB data URIs persists and GETs back (3 products carrying images)
+3. SUPPLIER STATEMENT DELIVERY PROGRESS: statement API now returns receivedQty per PO (items include receivedQty) + poStats.partial count. Type SupplierStatementOrder.receivedQty + poStats.partial added. Dialog: "Qty" column → "Delivery" column with DeliveryProgress component (received/ordered units + color-logic mini progress bar, cyan partial badge in status row); print clone column now "Delivered" as "n/m units". Browser-verified with Fresh Foods Supply Co: PO-0006 100% emerald 10/10, PO-0004 DRAFT 0% 0/10
+4. DEMO PRODUCT PHOTOS: generated 3 studio-style product photos via z-ai CLI (A4 paper ream / chocolate bar / white cube speaker, 1024px) → saved to download/product-img/, downscaled with ffmpeg to 128px JPEGs (0.9-2.3KB), attached as data URIs to STA-001, SNK-005, ELC-003 via PUT /api/products/:id. POS grid + products table now show real photos mixed with initials tiles — demonstrates both states
+
+Work Log — bug fixed (self-inflicted, caught immediately):
+- A failed MultiEdit batch on purchase-orders.tsx partially applied, stripping size/className/aria-label off the PO Delete button (accessibility regression). Restored the full button attributes; verified 10-view sweep + a11y labels intact
+
+Work Log — styling polish (mandatory):
+- GRN document: slate print palette, amber/green remaining-qty tones, signature rules — reads like a real warehouse form
+- Products table: avatar + name cluster with 8px gap keeps row rhythm; barcode stays secondary line
+- Statement: cyan partial badge joins the emerald/amber status row family
+- Product dialog: image preview tile gets border+bg so data-URI photos with white backgrounds sit correctly in dark mode
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+- agent-browser: full 10-view sweep 0 console errors + mobile spot checks (pos/products/suppliers) 0; GRN clone content verified; statement progress verified; product dialog preview verified; POS golden path with photo tiles verified
+- API curl: imageUrl PUT persisted for 3 SKUs; products GET returns imageUrl
+- dev.log: all 200s, no compile errors
+- Demo data delta: 3 products with embedded 128px JPEG data-URI photos (STA-001, SNK-005, ELC-003); download/product-img/ holds source PNGs + JPGs
+
+Stage Summary:
+- Backend: Product.imageUrl column + validation in both product routes; statement API returns receivedQty + partial stats; isValidImageUrl helper
+- Frontend: grn-print.tsx, product-avatar.tsx (shared), product dialog image field + preview, POS/cart/products-table avatar wiring, statement DeliveryProgress
+- Known limitations: images are URL/data-URI only (no file-upload storage in sandbox); ProductAvatar <img> uses plain src (remote hosts need CORS-free access; data URIs always safe); GRN assumes cumulative state (not per-delivery history — ledger holds that)
+- Schema note: Product.imageUrl nullable, default null — zero migration risk for existing rows
+
+Recommended next phase:
+- Server-side image upload endpoint (multipart → db/local storage) to replace URL pasting, product image in sale receipt + product performance report, GRN per-delivery history (ledger-based), stocktake session persistence, multi-user/auth pass, barcode scanner wedge tuning follow-up

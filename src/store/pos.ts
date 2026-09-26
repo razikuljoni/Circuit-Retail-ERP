@@ -121,6 +121,7 @@ export const usePosStore = create<PosState>((set, get) => ({
       name: product.name,
       sku: product.sku,
       unit: product.unit,
+      imageUrl: product.imageUrl ?? null,
       unitPrice: product.price,
       costPrice: product.costPrice,
       taxRate: product.taxRate,

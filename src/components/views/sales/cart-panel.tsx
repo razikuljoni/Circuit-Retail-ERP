@@ -24,25 +24,11 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { currencySymbol, fmtMoney, fmtQty } from '@/lib/format'
 import type { Customer, PaymentMethod } from '@/lib/types'
 import { cartTotals, MIN_QTY, usePosStore } from '@/store/pos'
-import { hashColor } from '@/components/views/products/colors'
+import { ProductAvatar } from '@/components/shared/product-avatar'
 
-/** Mini gradient tile matching the POS grid thumbnails (keyed off SKU). */
-function CartThumb({ sku, name }: { sku: string; name: string }) {
-  const color = hashColor(sku)
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
-  return (
-    <span
-      aria-hidden
-      className="flex size-8 shrink-0 select-none items-center justify-center rounded-md text-[11px] font-bold text-white shadow-sm ring-1 ring-black/5"
-      style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}B3 100%)` }}
-    >
-      {initials || '?'}
-    </span>
-  )
+/** Mini tile matching the POS grid thumbnails (falls back to initials). */
+function CartThumb({ sku, name, imageUrl }: { sku: string; name: string; imageUrl?: string | null }) {
+  return <ProductAvatar name={name} sku={sku} imageUrl={imageUrl} className="size-8 rounded-md" textClassName="text-[11px]" />
 }
 
 /** Qty input that lets users type decimals freely, committing valid values. */
@@ -128,7 +114,7 @@ export function CartPanel({
               <li key={item.key} className="rounded-lg border bg-card/60 p-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-start gap-2">
-                    <CartThumb sku={item.sku} name={item.name} />
+                    <CartThumb sku={item.sku} name={item.name} imageUrl={item.imageUrl} />
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{item.name}</p>
                       <p className="font-mono text-[10px] text-muted-foreground">

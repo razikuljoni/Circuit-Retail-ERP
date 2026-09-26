@@ -110,3 +110,9 @@ export function maxSeqOf(prefix: string, numbers: string[]): number {
 export function nextDocNumber(prefix: string, numbers: string[], pad = 4): string {
   return `${prefix}${String(maxSeqOf(prefix, numbers) + 1).padStart(pad, '0')}`
 }
+
+/** Validate a product image URL: http(s) URL or data:image URI, capped length. */
+export function isValidImageUrl(u: string): boolean {
+  if (u.length > 300_000) return false // ~300KB data-URI cap
+  return /^https?:\/\/.+/i.test(u) || /^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,[\s\S]+$/i.test(u)
+}

@@ -28,6 +28,8 @@ export interface Product {
   barcode?: string | null
   name: string
   description?: string | null
+  /** Optional product photo (http(s) URL or data:image URI) — falls back to initials tile */
+  imageUrl?: string | null
   unit: string
   categoryId?: string | null
   category?: Category | null
@@ -152,6 +154,7 @@ export interface CartItem {
   name: string
   sku: string
   unit: string
+  imageUrl?: string | null
   unitPrice: number
   costPrice: number
   taxRate: number
@@ -355,6 +358,8 @@ export interface SupplierStatementOrder {
   status: PurchaseOrderStatus
   itemCount: number
   totalQty: number
+  /** Units received so far across deliveries */
+  receivedQty: number
   totalCost: number
   note?: string | null
   createdAt: string
@@ -385,6 +390,7 @@ export interface SupplierStatement {
     total: number
     draft: number
     ordered: number
+    partial: number
     received: number
     cancelled: number
     draftValue: number

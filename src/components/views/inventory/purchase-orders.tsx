@@ -41,6 +41,7 @@ import { EmptyState } from '@/components/shared/page-bits'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Spinner } from '@/components/shared/page-bits'
 import { ReceiveDialog } from './receive-dialog'
+import { GrnPrintButton } from './grn-print'
 import { api } from '@/lib/api'
 import { fmtDate, fmtMoney, fmtQty } from '@/lib/format'
 import type { Product, PurchaseOrder, Supplier } from '@/lib/types'
@@ -270,6 +271,9 @@ export function PurchaseOrdersPanel({
                           >
                             <Trash2 className="size-4" />
                           </Button>
+                        )}
+                        {(po.status === 'ORDERED' || po.status === 'PARTIAL' || po.status === 'RECEIVED') && (
+                          <GrnPrintButton po={po} />
                         )}
                       </div>
                     </TableCell>
