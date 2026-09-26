@@ -19,6 +19,7 @@ import { DashboardKpis, QuickActions } from './dashboard/dashboard-kpis'
 import { DailyTrendCard, HourlySalesCard, PaymentMixCard, TopProductsCard } from './dashboard/dashboard-charts'
 import { LowStockCard, RecentExpensesCard, RecentSalesCard } from './dashboard/dashboard-lists'
 import { CashDrawerCard } from './dashboard/cash-drawer-card'
+import { ShiftStrip } from './dashboard/shift-strip'
 
 const REFRESH_SECS = 60
 
@@ -235,6 +236,8 @@ export default function DashboardView() {
         <ErrorState message={error} onRetry={() => void bump()} />
       ) : (
         <>
+          <ShiftStrip />
+
           <QuickActions onNavigate={setView} />
 
           <DashboardKpis data={data} loading={firstLoad} />

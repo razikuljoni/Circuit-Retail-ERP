@@ -124,6 +124,7 @@ model SaleItem {
   tax       Float   @default(0)
   total     Float   // net line total incl. discount & tax
   costPrice Float   @default(0) // snapshot
+  imageUrl  String? // product image snapshot at sale time (receipt thumbnails)
 }
 
 // ─────────────── Purchasing ───────────────
@@ -220,6 +221,7 @@ model Shift {
   closedAt     DateTime?
   openingFloat Float     @default(0) // cash in drawer at open
   countedCash  Float? // cash counted in drawer at close
+  totalsJson   String? // close-time snapshot {totals, expensesPaid, variance} for history/reprint
   note         String?
   openedBy     String? // cashier name (free text, no auth yet)
 }

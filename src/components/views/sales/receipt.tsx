@@ -4,7 +4,7 @@
 // Printing strategy: a hidden `.receipt-print-area` clone is portalled to
 // <body>; on Print we tag <body> with `printing-receipt`, call window.print(),
 // and the appended globals.css section shows ONLY that clone on paper.
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Printer, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -58,6 +58,27 @@ function Barcode({ seed }: { seed: string }) {
   )
 }
 
+/**
+ * 28px sale-line product snapshot — thermal-receipt sized, print-safe.
+ * Renders NOTHING when there is no image or the URL is broken, so legacy
+ * lines (imageUrl null) keep the exact layout they always had. Decorative:
+ * the line already prints the product name as text.
+ */
+function LineThumb({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false)
+  if (broken) return null
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      draggable={false}
+      onError={() => setBroken(true)}
+      className="h-7 w-7 shrink-0 rounded border border-black/40 object-cover print:grayscale"
+    />
+  )
+}
+
 /** The paper itself — reused for the on-screen preview and the print clone. */
 export function ReceiptPaper({ sale }: { sale: Sale }) {
   const settings = useUiStore((s) => s.settings)
@@ -102,19 +123,22 @@ export function ReceiptPaper({ sale }: { sale: Sale }) {
         {sale.items.map((item) => {
           const line = item.unitPrice * item.qty - item.discount
           return (
-            <div key={item.id}>
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="min-w-0 truncate">
-                  {fmtQty(item.qty)} × {item.name}
-                </span>
-                <span className="shrink-0 font-bold">{fmtMoney(line)}</span>
-              </div>
-              <div className="flex justify-between gap-2 text-[10px] opacity-70">
-                <span className="truncate">
-                  {item.sku} @ {fmtMoney(item.unitPrice)}
-                  {item.discount > 0 ? ` · disc ${fmtMoney(item.discount)}` : ''}
-                </span>
-                {item.tax > 0 && <span className="shrink-0">tax {fmtMoney(item.tax)}</span>}
+            <div key={item.id} className="flex items-center gap-1.5">
+              {item.imageUrl && <LineThumb src={item.imageUrl} />}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="min-w-0 truncate">
+                    {fmtQty(item.qty)} × {item.name}
+                  </span>
+                  <span className="shrink-0 font-bold">{fmtMoney(line)}</span>
+                </div>
+                <div className="flex justify-between gap-2 text-[10px] opacity-70">
+                  <span className="truncate">
+                    {item.sku} @ {fmtMoney(item.unitPrice)}
+                    {item.discount > 0 ? ` · disc ${fmtMoney(item.discount)}` : ''}
+                  </span>
+                  {item.tax > 0 && <span className="shrink-0">tax {fmtMoney(item.tax)}</span>}
+                </div>
               </div>
             </div>
           )

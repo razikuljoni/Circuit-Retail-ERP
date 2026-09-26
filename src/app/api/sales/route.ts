@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
         tax: number
         total: number
         costPrice: number
+        imageUrl: string | null
       }[] = []
 
       for (const item of body.items) {
@@ -174,6 +175,9 @@ export async function POST(req: NextRequest) {
           tax: round2(lineTax),
           total: round2(lineTotal + lineTax),
           costPrice: product.costPrice,
+          // Snapshot the product photo at sale time (receipt/detail thumbnails);
+          // stays null for products without an image and for legacy sale rows.
+          imageUrl: product.imageUrl,
         })
       }
 

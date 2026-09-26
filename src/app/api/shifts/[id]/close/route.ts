@@ -1,10 +1,14 @@
 // POST /api/shifts/[id]/close — close a shift with a counted-cash snapshot
-// Recomputes totals over [openedAt, closeTime), stores countedCash + variance.
+// Recomputes totals over [openedAt, closeTime), stores countedCash + variance
+// and persists the close-time snapshot (ShiftSnapshot) into totalsJson in the
+// SAME update as closedAt so history/reprint never needs a recompute.
+// Backward compatible: shifts closed before snapshots existed keep totalsJson = null.
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { bad, zodMsg, round2 } from '@/lib/api-utils'
 import { shiftTotals } from '../../totals'
+import type { ShiftSnapshot } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,9 +39,18 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         : body.note
       : shift.note
 
+    // Persisted snapshot for /api/shifts history + the reprint dialog
+    // (shape mirrors ShiftSnapshot in src/lib/types.ts).
+    const snapshot = JSON.stringify({
+      totals,
+      expensesPaid,
+      variance,
+      closedAt: closedAt.toISOString(),
+    } satisfies ShiftSnapshot)
+
     const updated = await db.shift.update({
       where: { id },
-      data: { closedAt, countedCash: round2(body.countedCash), note },
+      data: { closedAt, countedCash: round2(body.countedCash), note, totalsJson: snapshot },
     })
 
     return NextResponse.json({ shift: updated, totals, expensesPaid, variance })

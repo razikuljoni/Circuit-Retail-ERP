@@ -26,6 +26,28 @@ interface SettledSale extends Sale {
   settledNow?: number
 }
 
+/**
+ * 32px product snapshot next to the sale-line name/sku. Renders NOTHING when
+ * there is no image or the URL is broken, so legacy lines (imageUrl null)
+ * keep their previous layout with no empty gap. Decorative: the row already
+ * shows the product name and sku as text.
+ */
+function SaleItemThumb({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false)
+  if (broken) return null
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      loading="lazy"
+      draggable={false}
+      onError={() => setBroken(true)}
+      className="h-8 w-8 shrink-0 rounded-md border object-cover"
+    />
+  )
+}
+
 export function SaleDetailDialog({
   sale,
   open,
@@ -136,8 +158,13 @@ export function SaleDetailDialog({
                       {sale.items.map((item) => (
                         <tr key={item.id} className="border-b last:border-0">
                           <td className="px-3 py-2">
-                            <p className="font-medium">{item.name}</p>
-                            <p className="font-mono text-[10px] text-muted-foreground">{item.sku}</p>
+                            <div className="flex items-center gap-2">
+                              {item.imageUrl && <SaleItemThumb src={item.imageUrl} />}
+                              <div className="min-w-0">
+                                <p className="font-medium">{item.name}</p>
+                                <p className="font-mono text-[10px] text-muted-foreground">{item.sku}</p>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums">{fmtQty(item.qty)}</td>
                           <td className="px-2 py-2 text-right tabular-nums">{fmtMoney(item.unitPrice)}</td>

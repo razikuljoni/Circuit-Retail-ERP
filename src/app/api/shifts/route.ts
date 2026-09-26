@@ -22,6 +22,10 @@ export async function GET(req: NextRequest) {
       orderBy: { openedAt: 'desc' },
       take: limit,
     })
+    // Contract decision (18-a): totalsJson is returned as the RAW string that
+    // sits on Shift.totalsJson (src/lib/types.ts) — the client parses it
+    // defensively into ShiftSnapshot (see sales/shift-history.tsx). Legacy
+    // shifts closed before snapshots were persisted keep totalsJson = null.
     return NextResponse.json({ shifts })
   } catch (e) {
     console.error('GET /api/shifts error:', e)

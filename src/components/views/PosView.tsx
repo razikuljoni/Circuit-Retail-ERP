@@ -3,7 +3,7 @@
 // ── POS Terminal — catalog search + cart + checkout + receipts ────────────────
 // Keyboard: F2 focuses search, F9 opens checkout. On mobile the cart collapses
 // into a sticky bottom bar that opens the cart in a Sheet.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import {
@@ -31,7 +31,8 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { EmptyState, ErrorState, PageHeader, Spinner } from '@/components/shared/page-bits'
 import { cn } from '@/lib/utils'
 import { fmtDate, fmtMoney, fmtQty, fmtTime } from '@/lib/format'
-import type { Category, Customer, Product, Sale } from '@/lib/types'
+import type { Category, Customer, Product, Sale, ShiftCurrent } from '@/lib/types'
+import { api } from '@/lib/api'
 import { useApi } from '@/hooks/use-api'
 import { cartTotals, usePosStore } from '@/store/pos'
 import { ProductAvatar } from '@/components/shared/product-avatar'
@@ -39,6 +40,7 @@ import { CartPanel } from '@/components/views/sales/cart-panel'
 import { CheckoutDialog } from '@/components/views/sales/checkout-dialog'
 import { ReceiptDialog } from '@/components/views/sales/receipt'
 import { ShiftBar } from '@/components/views/pos/shift-bar'
+import { ShiftGuardDialog } from '@/components/views/pos/shift-guard-dialog'
 
 const MAX_RENDER = 60
 
@@ -101,8 +103,13 @@ export default function PosView() {
   const [cartSheetOpen, setCartSheetOpen] = useState(false)
   const [heldOpen, setHeldOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [guardOpen, setGuardOpen] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
+
+  // Set when a checkout attempt finds no open shift; consumed once the shift
+  // opens through the guard flow (auto-resume) or the user backs out.
+  const pendingCheckoutRef = useRef(false)
 
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -164,6 +171,45 @@ export default function PosView() {
     searchRef.current?.focus()
   }, [])
 
+  // ── Shift-guarded checkout ──────────────────────────────────────────────────
+  // Every checkout entry point (Charge button, mobile cart sheet, F9) funnels
+  // here: a FRESH /api/shifts/current check decides between the normal checkout
+  // dialog and the "No shift is open" guard. The cart is never touched while
+  // guarded — items, discounts, customer and note all stay put.
+  // (Stable via useCallback: only store getState + setters + the api client.)
+  const attemptCheckout = useCallback(async () => {
+    if (usePosStore.getState().cart.length === 0) return
+    try {
+      const current = await api.get<ShiftCurrent>('/api/shifts/current')
+      if (current.shift) {
+        setCheckoutOpen(true)
+        return
+      }
+      pendingCheckoutRef.current = true
+      setGuardOpen(true)
+    } catch {
+      // Shift service unreachable — don't block the sale on a soft process guard.
+      setCheckoutOpen(true)
+    }
+  }, [])
+
+  const handleGuardShiftOpened = useCallback(() => {
+    if (!pendingCheckoutRef.current) return
+    pendingCheckoutRef.current = false
+    if (usePosStore.getState().cart.length > 0) {
+      // Auto-resume: let the open-shift dialog unmount first, then check out.
+      window.setTimeout(() => setCheckoutOpen(true), 120)
+    } else {
+      toast.info('Cart was cleared — nothing to check out', {
+        description: 'Shift is open; start the next sale.',
+      })
+    }
+  }, [])
+
+  const handleGuardAborted = useCallback(() => {
+    pendingCheckoutRef.current = false
+  }, [])
+
   // ── Global keyboard shortcuts ──────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -172,12 +218,12 @@ export default function PosView() {
         searchRef.current?.focus()
       } else if (e.key === 'F9') {
         e.preventDefault()
-        if (usePosStore.getState().cart.length > 0) setCheckoutOpen(true)
+        void attemptCheckout()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [attemptCheckout])
 
   const handleClearCart = () => {
     clearCart()
@@ -400,7 +446,7 @@ export default function PosView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <CartPanel customers={customers ?? []} onCheckout={() => setCheckoutOpen(true)} />
+              <CartPanel customers={customers ?? []} onCheckout={() => void attemptCheckout()} />
             </CardContent>
           </Card>
         </aside>
@@ -442,7 +488,7 @@ export default function PosView() {
               customers={customers ?? []}
               onCheckout={() => {
                 setCartSheetOpen(false)
-                setCheckoutOpen(true)
+                void attemptCheckout()
               }}
             />
           </div>
@@ -506,6 +552,12 @@ export default function PosView() {
 
       {/* ── Dialogs ─────────────────────────────────────────────────────────── */}
       <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} onCompleted={handleCheckoutComplete} customers={customers ?? []} />
+      <ShiftGuardDialog
+        open={guardOpen}
+        onOpenChange={setGuardOpen}
+        onShiftOpened={handleGuardShiftOpened}
+        onAborted={handleGuardAborted}
+      />
       <ReceiptDialog sale={receiptSale} onDone={() => setReceiptSale(null)} />
       <ConfirmDialog
         open={clearOpen}

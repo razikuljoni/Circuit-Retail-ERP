@@ -90,6 +90,7 @@ export interface SaleItem {
   tax: number
   total: number
   costPrice: number
+  imageUrl?: string | null // product image snapshot at sale time (receipt thumbnails)
 }
 
 export interface Sale {
@@ -456,6 +457,16 @@ export interface Shift {
   countedCash: number | null
   note: string | null
   openedBy: string | null
+  /** Raw close-time snapshot JSON ({totals, expensesPaid, variance}) — parse via ShiftSnapshot. */
+  totalsJson?: string | null
+}
+
+/** Parsed Shift.totalsJson — persisted at close so history/reprint needs no recompute. */
+export interface ShiftSnapshot {
+  totals: ShiftCurrent['totals']
+  expensesPaid: number
+  variance: number
+  closedAt: string
 }
 
 /** GET /api/shifts/current — the open shift (or null) with live cash totals. */
