@@ -307,3 +307,43 @@ Stage Summary:
 
 Recommended next phase:
 - PDF/Excel report export (P&L, aging, inventory valuation), supplier-level "Suggest POs" inside Inventory low-stock tab reusing bulk-draft, expense recurring templates, multi-user/auth pass, product images, barcode-scanner keyboard wedge tuning in POS
+
+---
+Task ID: 12 (cron round 5)
+Agent: Z (main)
+Task: Status assessment + agent-browser QA + 3 new features (stocktake, expense templates, P&L print) + scanner-wedge POS + real bug fix (doc-number collisions) + styling polish
+
+Work Log — status assessment:
+- Baseline healthy at start: all 10 views render live data (desktop 1280/1600 + mobile 390, light/dark), 0 console errors, lint 0 errors (1 benign RHF warning), tsc clean in src/, all API 200; POS golden path re-verified (add-to-cart → totals → Charge enabled)
+- Dev server restarted mid-round after schema push (fresh Prisma client) via (setsid bun run dev &) double-fork
+
+Work Log — bugs found & fixed:
+1. REAL BUG (pre-existing, caught by browser E2E): document numbers used count-based sequencing (`count(prefix) + 1`), so once a PO was deleted during the day the next bulk-draft/PO create hit `Unique constraint failed on poNo` (500). Fixed with gap-safe max+1 sequencing: new `maxSeqOf`/`nextDocNumber` helpers in src/lib/api-utils.ts; applied to POST /api/purchase-orders (nextPoNo), POST /api/purchase-orders/bulk-draft (inside tx), and POST /api/sales invoiceNo (defensive — invoices aren't deleted but same pattern). Verified: after deleting smoke POs 0004/0005, new POs correctly number 0006/0007
+2. Minor mobile styling: DUE/LIMIT badges on customer cards could crowd the kebab menu at 390px → badges now wrap in a flex-wrap row with pr-7, verified no overlap
+
+Work Log — new features shipped:
+1. STOCKTAKE (physical inventory count): new POST /api/stock/stocktake (zod-validated up to 500 rows, transactional per-product ADJUST movements with reference STOCKTAKE, skips unchanged rows, returns per-item before/after/delta + varianceValue at cost). New inventory/stocktake-dialog.tsx: search, per-row counted input (placeholder = system stock), live variance badges (+green/−red), "Changed only" filter, running "N rows will be corrected (±৳X at cost)" summary with reset, note field, result panel after apply. Entry: Inventory header "Stocktake" button. Browser-verified full flow: counted STA-001 36→37 (+1, +৳400 variance) → toast + result panel → ledger shows ADJUST ref STOCKTAKE → reverted 37→36 the same way
+2. RECURRING EXPENSE TEMPLATES: new Prisma model ExpenseTemplate (title/category/amount/method/frequency DAILY|WEEKLY|MONTHLY/lastPostedAt/active), schema pushed + server restarted. New API: GET/POST /api/expense-templates, PUT/DELETE /api/expense-templates/[id], POST /api/expense-templates/[id]/post (transactional: creates today's Expense with reference TPL:<title> + stamps lastPostedAt). New expenses/templates-dialog.tsx: list with category dot, frequency badge, method, last-posted, amount; inline create/edit form; per-row Post-today / Edit / Delete (ConfirmDialog). Entry: Expenses header "Templates" button. Browser-verified: post → toast "Expense posted — Shop rent ৳12,000" → "last posted 27 Sep 2026"; posted expense then deleted + lastPostedAt reset to keep demo numbers clean (template kept as demo data)
+3. P&L PRINT / PDF: new reports/pnl-print.tsx — Print button in the P&L breakdown card header; hidden .report-print-area clone (store header, range, waterfall table, summary, expenses by category, net margin) rendered at component root; on Print body tagged `printing-report`, globals.css A4 print block isolates the clone (ink-friendly, table borders, tabular-nums right-aligned). Same proven pattern as Z-report. Browser-verified class tagging + cleanup (window.print stubbed)
+4. POS SCANNER WEDGE TUNING: Enter handler now (a) supports quantity prefix `3*SKU` / `3xBARCODE` (adds N units in one scan, clamped to stock), (b) prefers exact barcode then exact SKU match (case-insensitive) over substring matches, (c) shows "No product matches X" toast instead of silent no-op; query preserved after failed match for easy correction; pos store addItem(product, qty?) extended; search input gained title hint. Browser-verified: 3*STA-001 → 3 × A4 Paper (৳1,680 total), sta-002 exact match adds pen, ZZZ-NOPE → error toast
+
+Work Log — styling polish (mandatory):
+- KPI COUNT-UP: new hooks/use-count-up.ts (rAF ease-out tween, prefers-reduced-motion respected, cascading-render-safe); StatCard gained animatedValue {value, format} + valueClassName props; all 6 dashboard KPIs now glide on load/refresh (Sales/Transactions/Gross/Expenses/Net/Stock Value), Net Profit keeps emerald/red tone via valueClassName
+- Products table: new Margin column (xl+ breakpoints) with colored margin badges (≥25% emerald, 10–25% amber, <10% red, tooltip shows cost→price) — margin quality visible at a glance; min-w bumped to 960px
+- Templates dialog footnote reflow (icon top-aligned, nowrap code chip) after spotting cramped wrap in screenshot
+- ConfirmDialog: optional leading icon in a soft primary chip (used by Draft-POs confirm)
+- Inventory low-stock tab: amber-tinted attention banner with count + "Draft POs for all" action
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+- agent-browser: full 10-view sweep 0 console errors (1280 + 1600 + 390px); stocktake/PO-draft/templates/post flows all green; print trigger verified with stubbed window.print
+- API curl suite: expense-templates CRUD + post, stocktake (adjust + revert), bulk-draft gap-safe numbering — all verified; recent dev.log entries all 200
+- Demo data delta: 2 DRAFT POs PO-20260927-0006/0007 (from low-stock flow), 1 template "Shop rent — Uttara branch" (৳12,000/mo, never posted), 3 STOCKTAKE ADJUST movements in ledger (net zero), STA-002/ELC-003 still low for badge demos
+
+Stage Summary:
+- Backend surface added: /api/stock/stocktake, /api/expense-templates (+[id], +[id]/post); ExpenseTemplate model; gap-safe doc numbering helper (maxSeqOf/nextDocNumber) fixes unique-violation class of bugs
+- Frontend: Stocktake dialog, Templates dialog, P&L print, scanner-wedge POS entry, KPI count-up, Products margin column, DUE badge mobile fix
+- Known limitations: stocktake UI page size capped at 200 search results (API takes 500); templates are manual-post only (no scheduler by design — posting is an explicit cashier action); P&L print layout is A4 (receipt printer stays for invoices)
+
+Recommended next phase:
+- Inventory valuation print + aging report print (same report-print-area pattern), supplier statement view (PO history per supplier), stocktake session persistence (save in-progress counts), expense attachments, product images, multi-user/auth pass, cashier shift (X-report) tracking

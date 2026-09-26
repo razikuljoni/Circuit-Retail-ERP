@@ -1,5 +1,6 @@
 'use client'
 
+import type { LucideIcon } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +21,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   destructive = true,
   pending = false,
+  icon: Icon,
   onConfirm,
 }: {
   open: boolean
@@ -29,13 +31,25 @@ export function ConfirmDialog({
   confirmLabel?: string
   destructive?: boolean
   pending?: boolean
+  /** Optional leading icon (rendered in a soft primary chip) */
+  icon?: LucideIcon
   onConfirm: () => void
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogTitle className="flex items-center gap-2.5">
+            {Icon && (
+              <span
+                aria-hidden
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+              >
+                <Icon className="size-4" />
+              </span>
+            )}
+            <span className="leading-snug">{title}</span>
+          </AlertDialogTitle>
           <AlertDialogDescription>{message}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

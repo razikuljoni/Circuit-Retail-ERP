@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   AlertTriangle,
+  ClipboardCheck,
   Download,
   Package,
   PackagePlus,
   Plus,
   ShoppingCart,
   SlidersHorizontal,
+  Truck,
   Warehouse,
 } from 'lucide-react'
 import { api, qs } from '@/lib/api'
@@ -31,6 +33,8 @@ import { StatCard } from '@/components/shared/stat-card'
 import { AdjustDialog, type AdjustType } from './inventory/adjust-dialog'
 import { MovementBadge } from './inventory/movement-type'
 import { PurchaseOrdersPanel } from './inventory/purchase-orders'
+import { StocktakeDialog } from './inventory/stocktake-dialog'
+import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { downloadMovementsCsv } from './inventory/csv'
 
 const LEDGER_PAGE = 50
@@ -95,6 +99,30 @@ export default function InventoryView() {
   const [adjustProductId, setAdjustProductId] = useState<string | null>(null)
   const [adjustType, setAdjustType] = useState<AdjustType>('PURCHASE')
 
+  // ── Stocktake + bulk draft PO state ──
+  const [stocktakeOpen, setStocktakeOpen] = useState(false)
+  const [draftPoOpen, setDraftPoOpen] = useState(false)
+  const [draftPoPending, setDraftPoPending] = useState(false)
+  async function draftPosFromLowStock() {
+    setDraftPoPending(true)
+    try {
+      const res = await api.post<{ created: { poNo: string; supplierName: string; itemCount: number; totalCost: number }[] }>(
+        '/api/purchase-orders/bulk-draft',
+        { productIds: lowStockProducts.map((p) => p.id), note: 'Drafted from Inventory low-stock tab' }
+      )
+      const est = res.created.reduce((s, c) => s + c.totalCost, 0)
+      const summary =
+        res.created.map((c) => `${c.poNo} · ${c.supplierName} · ${c.itemCount} items`).join(' · ') +
+        (est > 0 ? ` — est. ${fmtMoney(est, { compact: true })}` : '')
+      toast.success(`${res.created.length} draft PO${res.created.length === 1 ? '' : 's'} created`, { description: summary })
+      setDraftPoOpen(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to draft purchase orders')
+    } finally {
+      setDraftPoPending(false)
+    }
+  }
+
   // ── Quick restock ──
   const [restockId, setRestockId] = useState<string | null>(null)
   async function quickRestock(p: Product) {
@@ -134,6 +162,10 @@ export default function InventoryView() {
         subtitle="Receive, adjust and audit stock movements"
         actions={
           <>
+            <Button variant="outline" onClick={() => setStocktakeOpen(true)}>
+              <ClipboardCheck className="size-4" />
+              <span className="hidden sm:inline">Stocktake</span>
+            </Button>
             <Button variant="outline" onClick={() => downloadMovementsCsv(movements)} disabled={movements.length === 0}>
               <Download className="size-4" />
               <span className="hidden sm:inline">Export movements</span>
@@ -302,6 +334,18 @@ export default function InventoryView() {
             {/* ── Low stock ── */}
             {tab === 'low' && (
               <Card className="overflow-hidden">
+                {lowStockProducts.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-amber-500/5 px-4 py-3">
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground tabular-nums">{lowStockProducts.length}</span>{' '}
+                      product{lowStockProducts.length === 1 ? '' : 's'} need attention — order replacements before you run out.
+                    </p>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => setDraftPoOpen(true)}>
+                      <Truck className="size-3.5" aria-hidden />
+                      Draft POs for all
+                    </Button>
+                  </div>
+                )}
                 {lowStockProducts.length === 0 ? (
                   <EmptyState
                     icon={PackagePlus}
@@ -520,6 +564,27 @@ export default function InventoryView() {
           productsQ.refetch()
           movementsQ.refetch()
         }}
+      />
+
+      <StocktakeDialog
+        open={stocktakeOpen}
+        onOpenChange={setStocktakeOpen}
+        products={products}
+        onDone={() => {
+          productsQ.refetch()
+          movementsQ.refetch()
+        }}
+      />
+
+      <ConfirmDialog
+        open={draftPoOpen}
+        onOpenChange={setDraftPoOpen}
+        icon={Truck}
+        title="Draft purchase orders for all low-stock items?"
+        message={`Products will be grouped by supplier into one draft PO each (skipping items without a supplier). Suggested quantity per product: max(2× reorder level − stock, 10). You can review, edit and receive them in the Purchase orders tab.`}
+        confirmLabel={`Draft ${lowStockProducts.length > 0 ? `POs (${lowStockProducts.length} items)` : 'POs'}`}
+        pending={draftPoPending}
+        onConfirm={draftPosFromLowStock}
       />
     </div>
   )

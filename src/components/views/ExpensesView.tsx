@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Pencil,
   ReceiptText,
+  Repeat2,
   Trash2,
   Wallet,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ import { StatCard } from '@/components/shared/stat-card'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ExpenseDialog } from './expenses/expense-dialog'
 import { CategoryDialog } from './expenses/category-dialog'
+import { TemplatesDialog } from './expenses/templates-dialog'
 import { METHOD_META, METHODS } from './expenses/method-meta'
 import { monthKeyOf, monthLabel, monthRange, shiftMonth } from './expenses/month-range'
 import { useDebouncedValue } from './expenses/use-debounced-value'
@@ -77,6 +79,7 @@ export default function ExpensesView() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [catsOpen, setCatsOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
   const [deletePending, setDeletePending] = useState(false)
 
@@ -110,14 +113,20 @@ export default function ExpensesView() {
         title="Expenses"
         subtitle="Track where the money goes"
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null)
-              setDialogOpen(true)
-            }}
-          >
-            Add expense
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setTemplatesOpen(true)}>
+              <Repeat2 className="size-4" aria-hidden />
+              Templates
+            </Button>
+            <Button
+              onClick={() => {
+                setEditing(null)
+                setDialogOpen(true)
+              }}
+            >
+              Add expense
+            </Button>
+          </>
         }
       />
 
@@ -373,6 +382,13 @@ export default function ExpensesView() {
       />
 
       <CategoryDialog open={catsOpen} onOpenChange={setCatsOpen} categories={catsQ.data ?? []} onChanged={refetchAll} />
+
+      <TemplatesDialog
+        open={templatesOpen}
+        onOpenChange={setTemplatesOpen}
+        categories={catsQ.data ?? []}
+        onPosted={refetch}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

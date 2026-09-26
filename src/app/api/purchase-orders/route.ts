@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { bad, zodMsg, round2 } from '@/lib/api-utils'
+import { bad, zodMsg, round2, nextDocNumber } from '@/lib/api-utils'
 import { dhakaDateKey } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -106,9 +106,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** PO-YYYYMMDD-#### sequence per Dhaka day. */
+/** PO-YYYYMMDD-#### sequence per Dhaka day (gap-safe: max+1, not count). */
 async function nextPoNo(): Promise<string> {
   const prefix = `PO-${dhakaDateKey(new Date()).replace(/-/g, '')}-`
-  const count = await db.purchaseOrder.count({ where: { poNo: { startsWith: prefix } } })
-  return `${prefix}${String(count + 1).padStart(4, '0')}`
+  const rows = await db.purchaseOrder.findMany({
+    where: { poNo: { startsWith: prefix } },
+    select: { poNo: true },
+  })
+  return nextDocNumber(prefix, rows.map((r) => r.poNo))
 }

@@ -44,6 +44,23 @@ function stockTone(p: Product): { cls: string; label: string } {
   return { cls: '', label: 'ok' }
 }
 
+/** Profit margin badge — green at healthy markup, amber/red as it thins out. */
+function MarginBadge({ price, cost }: { price: number; cost: number }) {
+  if (price <= 0) return <span className="text-muted-foreground text-sm">—</span>
+  const margin = ((price - cost) / price) * 100
+  const cls =
+    margin >= 25
+      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+      : margin >= 10
+        ? 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+        : 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400'
+  return (
+    <Badge variant="outline" className={cls} title={`Cost ${fmtMoney(cost)} → Price ${fmtMoney(price)}`}>
+      <span className="tabular-nums">{margin.toFixed(0)}%</span>
+    </Badge>
+  )
+}
+
 export default function ProductsView() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search)
@@ -311,13 +328,14 @@ export default function ProductsView() {
               />
             ) : (
               <div className="overflow-x-auto">
-                <Table className="min-w-[880px]">
+                <Table className="min-w-[960px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[130px]">SKU</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead className="hidden md:table-cell">Category</TableHead>
                       <TableHead className="text-right">Price</TableHead>
+                      <TableHead className="hidden xl:table-cell text-right">Margin</TableHead>
                       <TableHead className="hidden sm:table-cell text-right">Tax</TableHead>
                       <TableHead className="text-right">Stock</TableHead>
                       <TableHead className="hidden lg:table-cell">Status</TableHead>
@@ -353,6 +371,9 @@ export default function ProductsView() {
                           <TableCell className="text-right whitespace-nowrap">
                             <div className="font-semibold tabular-nums">{fmtMoney(p.price)}</div>
                             <div className="text-[11px] text-muted-foreground tabular-nums">{fmtMoney(p.costPrice)}</div>
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell text-right">
+                            <MarginBadge price={p.price} cost={p.costPrice} />
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-right tabular-nums text-muted-foreground">
                             {p.taxRate}%

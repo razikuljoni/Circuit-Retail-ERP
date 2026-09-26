@@ -65,7 +65,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
     <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
       <StatCard
         title="Today Sales"
-        value={fmtMoneyInt(today.sales)}
+        animatedValue={{ value: today.sales, format: (n) => fmtMoneyInt(n) }}
         icon={Banknote}
         trend={salesTrend !== undefined ? { value: salesTrend } : undefined}
         hint={`vs yesterday ${fmtMoney(yesterday.sales, { compact: true })}`}
@@ -73,14 +73,14 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
       />
       <StatCard
         title="Transactions"
-        value={today.transactions}
+        animatedValue={{ value: today.transactions, format: (n) => Math.round(n).toLocaleString() }}
         icon={ReceiptText}
         hint={`avg basket ${fmtMoney(today.avgBasket, { compact: true })}`}
         accent="bg-gradient-to-r from-primary/40 to-transparent"
       />
       <StatCard
         title="Gross Profit"
-        value={fmtMoneyInt(today.grossProfit)}
+        animatedValue={{ value: today.grossProfit, format: (n) => fmtMoneyInt(n) }}
         icon={TrendingUp}
         trend={profitTrend !== undefined ? { value: profitTrend } : undefined}
         hint={`vs yesterday ${fmtMoney(yesterday.grossProfit, { compact: true })}`}
@@ -89,7 +89,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
       />
       <StatCard
         title="Expenses Today"
-        value={fmtMoneyInt(today.expenses)}
+        animatedValue={{ value: today.expenses, format: (n) => fmtMoneyInt(n) }}
         icon={Wallet}
         trend={expTrend !== undefined ? { value: expTrend } : undefined}
         trendDownIsGood
@@ -99,11 +99,11 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
       />
       <StatCard
         title="Net Profit"
-        value={
-          <span className={netPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
-            {fmtMoneyInt(today.netProfit)}
-          </span>
-        }
+        animatedValue={{
+          value: today.netProfit,
+          format: (n) => fmtMoneyInt(n),
+        }}
+        valueClassName={netPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}
         icon={PiggyBank}
         trend={netTrend !== undefined ? { value: netTrend } : undefined}
         hint="gross profit − expenses"
@@ -112,7 +112,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
       />
       <StatCard
         title="Stock Value"
-        value={fmtMoney(stockValue.cost, { compact: true })}
+        animatedValue={{ value: stockValue.cost, format: (n) => fmtMoney(n, { compact: true }) }}
         icon={Boxes}
         hint={`${stockValue.outOfStock} out of stock, ${stockValue.lowStock} low`}
         iconClassName="bg-violet-500/10"

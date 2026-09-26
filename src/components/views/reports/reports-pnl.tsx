@@ -8,6 +8,7 @@ import { StatCard } from '@/components/shared/stat-card'
 import { EmptyState } from '@/components/shared/page-bits'
 import { dayKeyToUTCStart, fmtDate, fmtMoney, fmtMoneyInt } from '@/lib/format'
 import type { PnlReport } from '@/lib/types'
+import { PnlPrintButton } from './pnl-print'
 
 function rangeLabel(from: string, to: string): string {
   return `${fmtDate(dayKeyToUTCStart(from))} → ${fmtDate(dayKeyToUTCStart(to))}`
@@ -113,9 +114,12 @@ export function PnlTab({ data, from, to }: { data: PnlReport; from: string; to: 
       </div>
 
       <Card className="gap-4">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">P&amp;L breakdown</CardTitle>
-          <CardDescription className="text-xs">{rangeLabel(from, to)}</CardDescription>
+        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="text-sm font-semibold">P&amp;L breakdown</CardTitle>
+            <CardDescription className="text-xs">{rangeLabel(from, to)}</CardDescription>
+          </div>
+          <PnlPrintButton data={data} from={from} to={to} />
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
           {/* Left: waterfall */}

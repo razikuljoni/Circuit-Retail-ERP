@@ -99,11 +99,37 @@ export default function PosView() {
     })
   }, [products, query, activeCategory])
 
+  /**
+   * Scanner-wedge aware Enter handler:
+   *  - "3*SKU" / "3xBARCODE" prefix adds that quantity in one scan
+   *  - exact barcode / SKU match always wins over substring matches
+   *  - no match → clear feedback instead of silently doing nothing
+   */
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return
-    const first = filtered[0]
-    if (!query.trim() || !first) return
-    addItem(first)
+    const raw = query.trim()
+    if (!raw) return
+
+    // Quantity prefix: "3*STA-001", "2x6901234567890"
+    let qty: number | undefined
+    let code = raw
+    const prefixMatch = /^([1-9]\d*(?:\.5)?)\s*[*xX×]\s*(.+)$/.exec(raw)
+    if (prefixMatch) {
+      qty = Number(prefixMatch[1])
+      code = prefixMatch[2].trim()
+    }
+
+    const q = code.toLowerCase()
+    const exact =
+      (products ?? []).find((p) => p.barcode && p.barcode.toLowerCase() === q) ??
+      (products ?? []).find((p) => p.sku.toLowerCase() === q)
+    const target = exact ?? filtered[0]
+
+    if (!target) {
+      toast.error(`No product matches "${code}"`, { description: 'Check the code or add the product first.' })
+      return
+    }
+    addItem(target, qty)
     setQuery('')
     // Keep focus in the search box for rapid barcode-style entry.
     requestAnimationFrame(() => searchRef.current?.focus())
@@ -196,6 +222,7 @@ export default function PosView() {
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search name / SKU / barcode — Enter adds first match"
                 aria-label="Search products"
+                title="Tip: 3*SKU or 3xBARCODE adds 3 units in one scan"
                 className="h-11 pl-9 pr-9"
               />
               {query && (

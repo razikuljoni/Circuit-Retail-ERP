@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { bad, zodMsg, round2, isDayKey, numParam } from '@/lib/api-utils'
+import { bad, zodMsg, round2, isDayKey, numParam, nextDocNumber } from '@/lib/api-utils'
 import { dayKeyToUTCStart, dayKeyToUTCEnd, dhakaDateKey } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -216,11 +216,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ── Invoice number: INV-YYYYMMDD-#### (sequence per Dhaka day) ──
+      // ── Invoice number: INV-YYYYMMDD-#### (gap-safe max+1 per Dhaka day) ──
       const now = new Date()
       const prefix = `INV-${dhakaDateKey(now).replace(/-/g, '')}-`
-      const seqCount = await tx.sale.count({ where: { invoiceNo: { startsWith: prefix } } })
-      const invoiceNo = `${prefix}${String(seqCount + 1).padStart(4, '0')}`
+      const existingInvoices = await tx.sale.findMany({
+        where: { invoiceNo: { startsWith: prefix } },
+        select: { invoiceNo: true },
+      })
+      const invoiceNo = nextDocNumber(prefix, existingInvoices.map((r) => r.invoiceNo))
 
       const created = await tx.sale.create({
         data: {

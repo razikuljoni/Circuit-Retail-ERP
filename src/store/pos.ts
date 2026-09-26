@@ -60,7 +60,7 @@ interface PosState {
   paymentMethod: PaymentMethod
   held: HeldCart[]
 
-  addItem: (product: Product) => void
+  addItem: (product: Product, qty?: number) => void
   setQty: (productId: string, qty: number) => void
   removeItem: (productId: string) => void
   setLineDiscount: (productId: string, amount: number) => void
@@ -89,24 +89,30 @@ export const usePosStore = create<PosState>((set, get) => ({
   paymentMethod: 'CASH',
   held: [],
 
-  addItem: (product) => {
+  addItem: (product, qty = 1) => {
     if (product.stock <= 0) {
       toast.error(`Out of stock — ${product.name}`)
       return
     }
+    // Scanner prefix support: "3*SKU" adds 3 units in one go (clamped to stock)
+    const add = Math.max(1, Math.floor(Number(qty) || 1))
     const existing = get().cart.find((i) => i.productId === product.id)
     if (existing) {
-      if (existing.qty + 1 > existing.stock) {
+      if (existing.qty + add > existing.stock) {
         toast.warning(`Only ${existing.stock} in stock`)
         return
       }
       set({
         cart: get().cart.map((i) =>
           i.productId === product.id
-            ? { ...i, qty: i.qty + 1, stock: product.stock, unitPrice: product.price }
+            ? { ...i, qty: i.qty + add, stock: product.stock, unitPrice: product.price }
             : i
         ),
       })
+      return
+    }
+    if (add > product.stock) {
+      toast.warning(`Only ${product.stock} in stock`)
       return
     }
     const item: CartItem = {
@@ -118,7 +124,7 @@ export const usePosStore = create<PosState>((set, get) => ({
       unitPrice: product.price,
       costPrice: product.costPrice,
       taxRate: product.taxRate,
-      qty: 1,
+      qty: add,
       discount: 0,
       stock: product.stock,
     }

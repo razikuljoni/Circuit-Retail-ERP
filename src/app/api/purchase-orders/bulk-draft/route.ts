@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { bad, zodMsg, round2 } from '@/lib/api-utils'
+import { bad, zodMsg, round2, maxSeqOf } from '@/lib/api-utils'
 import { dhakaDateKey } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -61,9 +61,13 @@ export async function POST(req: NextRequest) {
     const prefix = `PO-${dhakaDateKey(now).replace(/-/g, '')}-`
 
     const created = await db.$transaction(async (tx) => {
-      const baseSeq = await tx.purchaseOrder.count({ where: { poNo: { startsWith: prefix } } })
+      // Gap-safe sequence: max existing poNo for today (count() collides after deletions)
+      const existingNos = await tx.purchaseOrder.findMany({
+        where: { poNo: { startsWith: prefix } },
+        select: { poNo: true },
+      })
       const out: { id: string; poNo: string; supplierName: string; itemCount: number; totalCost: number }[] = []
-      let seq = baseSeq
+      let seq = maxSeqOf(prefix, existingNos.map((r) => r.poNo))
 
       for (const [supplierId, items] of bySupplier) {
         seq += 1

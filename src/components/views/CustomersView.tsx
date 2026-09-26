@@ -204,22 +204,26 @@ export default function CustomersView() {
                       <Mail className="size-3 shrink-0" aria-hidden /> {c.email}
                     </p>
                   ) : null}
-                  {(c.totalDue ?? 0) > 0 && (
-                    <Badge className="mt-1.5 border border-amber-500/40 bg-amber-500/10 text-[10px] font-bold text-amber-700 dark:text-amber-400" variant="outline">
-                      DUE {fmtMoney(c.totalDue ?? 0)}
-                    </Badge>
-                  )}
-                  {c.creditLimit != null && (c.totalDue ?? 0) > 0 && (
-                    <Badge
-                      className={`mt-1 ml-1 border text-[10px] font-bold ${
-                        (c.totalDue ?? 0) >= c.creditLimit
-                          ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400'
-                          : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                      }`}
-                      variant="outline"
-                    >
-                      LIMIT {fmtMoney(Math.max(0, c.creditLimit - (c.totalDue ?? 0)), { compact: true })} LEFT
-                    </Badge>
+                  {((c.totalDue ?? 0) > 0 || c.creditLimit != null) && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pr-7">
+                      {(c.totalDue ?? 0) > 0 && (
+                        <Badge className="border border-amber-500/40 bg-amber-500/10 text-[10px] font-bold text-amber-700 dark:text-amber-400" variant="outline">
+                          DUE {fmtMoney(c.totalDue ?? 0)}
+                        </Badge>
+                      )}
+                      {c.creditLimit != null && (c.totalDue ?? 0) > 0 && (
+                        <Badge
+                          className={`border text-[10px] font-bold ${
+                            (c.totalDue ?? 0) >= c.creditLimit
+                              ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400'
+                              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                          }`}
+                          variant="outline"
+                        >
+                          LIMIT {fmtMoney(Math.max(0, c.creditLimit - (c.totalDue ?? 0)), { compact: true })} LEFT
+                        </Badge>
+                      )}
+                    </div>
                   )}
                 </div>
                 <DropdownMenu>

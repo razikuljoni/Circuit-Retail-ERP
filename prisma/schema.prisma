@@ -159,8 +159,25 @@ model ExpenseCategory {
   name      String    @unique
   color     String?
   expenses  Expense[]
+  templates ExpenseTemplate[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+// Reusable expense blueprint — one click posts a real Expense for today
+model ExpenseTemplate {
+  id            String           @id @default(cuid())
+  title         String
+  categoryId    String?
+  category      ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  amount        Float
+  paymentMethod String           @default("CASH") // CASH | CARD | MOBILE | BANK
+  frequency     String           @default("MONTHLY") // DAILY | WEEKLY | MONTHLY
+  note          String?
+  lastPostedAt  DateTime?
+  active        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }
 
 model Expense {

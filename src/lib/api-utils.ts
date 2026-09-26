@@ -89,3 +89,24 @@ export function hourLabel(h: number): string {
 export function dhakaHour(d: Date): number {
   return new Date(d.getTime() + 6 * 3600 * 1000).getUTCHours()
 }
+
+/**
+ * Gap-safe document sequence: max existing sequence for a prefix (e.g.
+ * "INV-20260927-" over ["INV-20260927-0003", …]) → highest number found.
+ * Count-based sequencing collides once rows are deleted (poNo unique violation);
+ * max+1 stays correct regardless of gaps.
+ */
+export function maxSeqOf(prefix: string, numbers: string[]): number {
+  let max = 0
+  for (const no of numbers) {
+    if (!no.startsWith(prefix)) continue
+    const n = Number(no.slice(prefix.length))
+    if (Number.isFinite(n) && n > max) max = n
+  }
+  return max
+}
+
+/** Next zero-padded document number for a prefix (max + 1, gap-safe). */
+export function nextDocNumber(prefix: string, numbers: string[], pad = 4): string {
+  return `${prefix}${String(maxSeqOf(prefix, numbers) + 1).padStart(pad, '0')}`
+}

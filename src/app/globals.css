@@ -298,3 +298,65 @@
 }
 
 /* zreport v2 trigger */
+
+/* ── P&L report printing — clone on <body>, A4 paper ── */
+.report-print-area {
+  display: none;
+}
+
+@media print {
+  body.printing-report *:not(.report-print-area):not(.report-print-area *) {
+    display: none !important;
+  }
+  body.printing-report {
+    background: #fff !important;
+  }
+  body.printing-report .report-print-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 12mm 10mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11px !important;
+    line-height: 1.55 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body.printing-report .report-print-area * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: #94a3b8 !important;
+  }
+  body.printing-report .report-print-area table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  body.printing-report .report-print-area th,
+  body.printing-report .report-print-area td {
+    border-bottom: 1px solid #cbd5e1 !important;
+    padding: 4px 6px !important;
+    text-align: left !important;
+  }
+  body.printing-report .report-print-area th {
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    color: #475569 !important;
+  }
+  body.printing-report .report-print-area .num {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+  body.printing-report .report-print-area .rep-total {
+    font-weight: 700 !important;
+    border-top: 2px solid #334155 !important;
+  }
+  body.printing-report .report-print-area .rep-negative {
+    font-weight: 700 !important;
+  }
+}
+

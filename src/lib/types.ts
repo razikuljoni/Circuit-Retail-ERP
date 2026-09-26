@@ -303,3 +303,38 @@ export interface AgingReport {
   customersWithDues: number
   rows: AgingRow[]
 }
+
+// ── Expense templates (recurring expense blueprints) ──
+
+export type ExpenseFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+
+export interface ExpenseTemplate {
+  id: string
+  title: string
+  categoryId?: string | null
+  category?: ExpenseCategory | null
+  amount: number
+  paymentMethod: PaymentMethod
+  frequency: ExpenseFrequency
+  note?: string | null
+  lastPostedAt?: string | null
+  active: boolean
+  createdAt?: string
+}
+
+/** POST /api/stock/stocktake response (additive) */
+export interface StocktakeResult {
+  adjusted: number
+  unchanged: number
+  missing: string[]
+  varianceValue: number
+  items: {
+    productId: string
+    name: string
+    sku: string
+    unit: string
+    before: number
+    after: number
+    delta: number
+  }[]
+}
