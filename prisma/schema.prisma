@@ -211,3 +211,15 @@ model Settings {
   receiptFooter String  @default("Thank you for shopping with us!")
   lowStockDays  Int     @default(7)
 }
+
+// Cashier shift: opened when a cashier starts working, closed with an X-report
+// snapshot (counted cash → variance). One active shift at a time (closedAt == null).
+model Shift {
+  id           String    @id @default(cuid())
+  openedAt     DateTime
+  closedAt     DateTime?
+  openingFloat Float     @default(0) // cash in drawer at open
+  countedCash  Float? // cash counted in drawer at close
+  note         String?
+  openedBy     String? // cashier name (free text, no auth yet)
+}

@@ -235,6 +235,40 @@
   }
 }
 
+/* ── Shift close report printing (round 4) — clone pattern, half-sheet paper ── */
+.shift-print-area {
+  display: none;
+}
+
+@media print {
+  body.printing-shift *:not(.shift-print-area):not(.shift-print-area *) {
+    display: none !important;
+  }
+  body.printing-shift {
+    background: #fff !important;
+  }
+  body.printing-shift .shift-print-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 140mm !important;
+    margin: 0 auto !important;
+    padding: 8mm 6mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body.printing-shift .shift-print-area * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: #94a3b8 !important;
+  }
+}
+
 /* ── Barcode label printing styles (round 2) ── */
 @media print {
   body.printing-label *:not(.label-print-area):not(.label-print-area *) {
@@ -256,6 +290,38 @@
   body.printing-label .label-print-area .label-cell {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+}
+
+/* ── Bulk barcode label printing (round 11) — clone portalled to <body>,
+   3-up A4 grid; independent body class so single-label print is untouched ── */
+@media print {
+  body.printing-bulk-labels *:not(.bulk-label-print-area):not(.bulk-label-print-area *) {
+    display: none !important;
+  }
+  body.printing-bulk-labels {
+    background: #fff !important;
+  }
+  body.printing-bulk-labels .bulk-label-print-area {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    background: #fff !important;
+    padding: 8mm !important;
+  }
+  body.printing-bulk-labels .bulk-label-print-area .bulk-label-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 4mm !important;
+  }
+  body.printing-bulk-labels .bulk-label-print-area .bulk-label-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px dashed #64748b !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #000 !important;
   }
 }
 

@@ -3,7 +3,7 @@
 // ── Supplier statement dialog — portfolio, PO history, stats + A4 print ─────
 // Uses the shared `.report-print-area` clone pattern (body gets
 // `printing-report` while printing) so the same ink-friendly CSS applies.
-import { FileText, Loader2, Printer, Truck } from 'lucide-react'
+import { Download, FileText, Loader2, Printer, Truck } from 'lucide-react'
 import { currencySymbol, fmtDate, fmtDateTime, fmtMoney, fmtQty } from '@/lib/format'
 import type { SupplierStatement, SupplierStatementOrder } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
@@ -19,6 +19,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { EmptyState } from '@/components/shared/page-bits'
 import { PoStatusBadge } from '@/components/views/inventory/purchase-orders'
+import { downloadStatementCsv } from './csv'
 import { useUiStore } from '@/store/ui'
 
 function Stat({ label, value, tone, accent }: { label: string; value: string; tone?: string; accent?: string }) {
@@ -207,6 +208,18 @@ export function SupplierStatementDialog({
           )}
 
           <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={!s || s.orders.length === 0}
+              aria-label="Export statement as CSV"
+              onClick={() => {
+                if (s) downloadStatementCsv(s, supplierName)
+              }}
+            >
+              <Download className="size-3.5" aria-hidden /> Export CSV
+            </Button>
             <Button variant="outline" size="sm" className="h-9" disabled={!s} onClick={print}>
               <Printer className="size-3.5" aria-hidden /> Print statement
             </Button>

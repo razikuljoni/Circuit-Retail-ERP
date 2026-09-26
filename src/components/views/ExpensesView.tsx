@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Download,
   Pencil,
   ReceiptText,
   Repeat2,
@@ -25,6 +26,7 @@ import { StatCard } from '@/components/shared/stat-card'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ExpenseDialog } from './expenses/expense-dialog'
 import { AttachmentThumb } from './expenses/attachment-thumb'
+import { downloadExpensesCsv } from './expenses/csv'
 import { CategoryDialog } from './expenses/category-dialog'
 import { TemplatesDialog } from './expenses/templates-dialog'
 import { METHOD_META, METHODS } from './expenses/method-meta'
@@ -115,6 +117,16 @@ export default function ExpensesView() {
         subtitle="Track where the money goes"
         actions={
           <>
+            <Button
+              variant="outline"
+              disabled={expenses.length === 0}
+              aria-label="Export expenses as CSV"
+              onClick={() => downloadExpensesCsv(expenses, from, to)}
+            >
+              <Download className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">CSV</span>
+            </Button>
             <Button variant="outline" onClick={() => setTemplatesOpen(true)}>
               <Repeat2 className="size-4" aria-hidden />
               Templates

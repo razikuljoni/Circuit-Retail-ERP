@@ -446,3 +446,40 @@ export interface SupplierStatement {
   }
   orders: SupplierStatementOrder[]
 }
+
+// ── Cashier shifts ───────────────────────────────────────────────────────────
+export interface Shift {
+  id: string
+  openedAt: string
+  closedAt: string | null
+  openingFloat: number
+  countedCash: number | null
+  note: string | null
+  openedBy: string | null
+}
+
+/** GET /api/shifts/current — the open shift (or null) with live cash totals. */
+export interface ShiftCurrent {
+  shift: Shift | null
+  /** Live totals since the shift opened (zeros when no active shift). */
+  totals: {
+    transactions: number
+    grossSales: number
+    refunds: number
+    netSales: number
+    cashSales: number
+    cardSales: number
+    mobileSales: number
+    /** openingFloat + cashSales − cash refunds — the drawer expectation right now. */
+    expectedDrawer: number
+  }
+  expensesPaid: number // cash expenses recorded during the shift window
+}
+
+/** POST /api/shifts/[id]/close response — summary + variance for the close report. */
+export interface ShiftCloseResult {
+  shift: Shift
+  totals: ShiftCurrent['totals']
+  expensesPaid: number
+  variance: number // countedCash − expectedDrawer (null countedCash → 0)
+}

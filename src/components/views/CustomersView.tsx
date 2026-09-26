@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import {
   AlarmClock,
+  Download,
   HandCoins,
   History,
   Mail,
@@ -33,6 +34,7 @@ import {
 import { PageHeader, EmptyState, ErrorState, ViewLoader } from '@/components/shared/page-bits'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { useDebouncedValue } from './customers/use-debounced-value'
+import { downloadCustomersCsv } from './customers/csv'
 import { CustomerDialog } from './customers/customer-dialog'
 import { HistoryDialog } from './customers/history-dialog'
 import { AgingDialog } from './customers/aging-dialog'
@@ -131,6 +133,16 @@ export default function CustomersView() {
         subtitle="Profiles and purchase history"
         actions={
           <>
+            <Button
+              variant="outline"
+              disabled={customers.length === 0}
+              aria-label="Export customers as CSV"
+              onClick={() => downloadCustomersCsv(customers)}
+            >
+              <Download className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">CSV</span>
+            </Button>
             <Button variant="outline" onClick={() => setAgingOpen(true)}>
               <AlarmClock className="size-4" />
               <span className="hidden sm:inline">Aging</span>

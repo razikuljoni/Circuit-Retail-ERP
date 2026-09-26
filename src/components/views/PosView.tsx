@@ -38,6 +38,7 @@ import { ProductAvatar } from '@/components/shared/product-avatar'
 import { CartPanel } from '@/components/views/sales/cart-panel'
 import { CheckoutDialog } from '@/components/views/sales/checkout-dialog'
 import { ReceiptDialog } from '@/components/views/sales/receipt'
+import { ShiftBar } from '@/components/views/pos/shift-bar'
 
 const MAX_RENDER = 60
 
@@ -209,6 +210,7 @@ export default function PosView() {
         subtitle="Scan or search products to build a sale"
         actions={
           <>
+            <ShiftBar />
             <Button variant="outline" className="h-10" onClick={() => setHeldOpen(true)}>
               <Inbox className="size-4" aria-hidden />
               Held

@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ProductAvatar } from '@/components/shared/product-avatar'
+import { ImagePicker } from './image-picker'
 
 export const PRODUCT_UNITS = ['pcs', 'box', 'kg', 'ltr', 'pack'] as const
 
@@ -318,32 +318,12 @@ export function ProductDialog({
               {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="p-image">Product image URL</Label>
-              <div className="flex items-start gap-3">
-                <ProductAvatar
-                  name={watch('name') || '?'}
-                  imageUrl={watch('imageUrl') || null}
-                  className="size-14 rounded-xl border border-border/60 bg-muted/40"
-                  textClassName="text-base"
-                />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <Input
-                    id="p-image"
-                    placeholder="https://… or data:image/png;base64,…"
-                    className="font-mono text-xs"
-                    {...register('imageUrl')}
-                  />
-                  {errors.imageUrl ? (
-                    <p className="text-xs text-destructive">{errors.imageUrl.message}</p>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      Shown on POS tiles & product lists — falls back to initials when empty or broken.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ImagePicker
+              value={watch('imageUrl')}
+              onChange={(v) => setValue('imageUrl', v, { shouldValidate: true, shouldDirty: true })}
+              error={errors.imageUrl?.message}
+              disabled={isSubmitting}
+            />
 
             {isEdit && (
               <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">

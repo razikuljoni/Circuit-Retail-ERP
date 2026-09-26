@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Archive,
@@ -10,6 +10,7 @@ import {
   PackageSearch,
   Pencil,
   Plus,
+  Printer,
   Tags,
   Upload,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { PageHeader, EmptyState, ErrorState, ViewLoader } from '@/components/shared/page-bits'
 import { StatCard } from '@/components/shared/stat-card'
@@ -33,6 +35,7 @@ import { downloadProductsCsv } from './products/csv'
 import { useDebouncedValue } from './products/use-debounced-value'
 import { ProductDialog } from './products/product-dialog'
 import { LabelSheet } from './products/label-sheet'
+import { BulkLabelSheet } from './products/bulk-label-sheet'
 import { ImportDialog } from './products/import-dialog'
 import { ProductDetailDrawer } from './products/product-detail-drawer'
 
@@ -90,6 +93,61 @@ export default function ProductsView() {
 
   const products = data ?? []
 
+  // Bulk selection: Set of product ids the user ticked. Multi-select exists for
+  // the bulk label sheet; derived against the CURRENT list so counts/dialog
+  // always match what is visible (ids filtered out of the view simply idle in
+  // the set until ticked again or cleared — no phantom rows anywhere).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const selectedVisible = useMemo(
+    () => products.filter((p) => selectedIds.has(p.id)),
+    [products, selectedIds],
+  )
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      const allSelected = products.length > 0 && products.every((p) => next.has(p.id))
+      for (const p of products) {
+        if (allSelected) next.delete(p.id)
+        else next.add(p.id)
+      }
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  // Keyboard detail: Escape clears the selection — but only when nothing else
+  // is claiming it (no dialog/sheet open, not typing in a form field).
+  const hasSelection = selectedVisible.length > 0
+  useEffect(() => {
+    if (!hasSelection) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (document.querySelector('[role=dialog], [data-slot=sheet-content]')) return
+      const el = document.activeElement
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement | null)?.isContentEditable) return
+      clearSelection()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hasSelection])
+
+  const allVisibleSelected = products.length > 0 && products.every((p) => selectedIds.has(p.id))
+  const someVisibleSelected = products.some((p) => selectedIds.has(p.id))
+
   const stats = useMemo(() => {
     let costValue = 0
     let retailValue = 0
@@ -113,6 +171,7 @@ export default function ProductsView() {
   const [restoringId, setRestoringId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   function openCreate() {
     setEditing(null)
@@ -155,7 +214,7 @@ export default function ProductsView() {
   if (showSkeleton) return <ViewLoader />
 
   return (
-    <div>
+    <div className={selectedVisible.length > 0 ? 'pb-16 transition-[padding] duration-200' : 'transition-[padding] duration-200'}>
       <PageHeader
         icon={Package}
         title="Products"
@@ -334,6 +393,13 @@ export default function ProductsView() {
                 <Table className="min-w-[960px]">
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-9 pr-0">
+                        <Checkbox
+                          checked={allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false}
+                          onCheckedChange={toggleAllVisible}
+                          aria-label={allVisibleSelected ? 'Clear all selected products' : 'Select all visible products'}
+                        />
+                      </TableHead>
                       <TableHead className="w-[130px]">SKU</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead className="hidden md:table-cell">Category</TableHead>
@@ -350,6 +416,13 @@ export default function ProductsView() {
                       const tone = stockTone(p)
                       return (
                         <TableRow key={p.id}>
+                          <TableCell className="w-9 pr-0">
+                            <Checkbox
+                              checked={selectedIds.has(p.id)}
+                              onCheckedChange={() => toggleSelected(p.id)}
+                              aria-label={`Select ${p.name}`}
+                            />
+                          </TableCell>
                           <TableCell className="font-mono text-xs whitespace-nowrap">{p.sku}</TableCell>
                           <TableCell>
                             <button
@@ -492,6 +565,14 @@ export default function ProductsView() {
         />
       )}
 
+      {bulkOpen && selectedVisible.length > 0 && (
+        <BulkLabelSheet
+          products={selectedVisible}
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+        />
+      )}
+
       <ProductDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
@@ -513,6 +594,35 @@ export default function ProductsView() {
         pending={archivePending}
         onConfirm={confirmArchive}
       />
+
+      {/* Floating bulk action bar — only while a selection exists. The root
+          div gains pb-16 so the bar never covers the last rows / footer. */}
+      {selectedVisible.length > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Bulk selection actions"
+          className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1.5 rounded-full border bg-card/95 py-1.5 pl-4 pr-1.5 shadow-lg backdrop-blur animate-in fade-in slide-in-from-bottom-4 duration-300 sm:bottom-4 sm:gap-2"
+        >
+          <span
+            aria-live="polite"
+            title="Press Escape to clear the selection"
+            className="inline-flex items-center whitespace-nowrap rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary tabular-nums"
+          >
+            {selectedVisible.length} selected
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setBulkOpen(true)}
+            aria-label={`Print labels for ${selectedVisible.length} selected products`}
+          >
+            <Printer className="size-4" aria-hidden />
+            Print labels
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection} aria-label="Clear selection">
+            Clear
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
