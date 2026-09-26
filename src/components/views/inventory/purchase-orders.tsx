@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   PackageCheck,
+  PackageOpen,
   Plus,
   Send,
   ShoppingCart,
@@ -39,6 +40,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/shared/page-bits'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Spinner } from '@/components/shared/page-bits'
+import { ReceiveDialog } from './receive-dialog'
 import { api } from '@/lib/api'
 import { fmtDate, fmtMoney, fmtQty } from '@/lib/format'
 import type { Product, PurchaseOrder, Supplier } from '@/lib/types'
@@ -49,6 +51,7 @@ export function PoStatusBadge({ status }: { status: PurchaseOrder['status'] }) {
   const map: Record<string, string> = {
     DRAFT: 'bg-muted text-muted-foreground border-border',
     ORDERED: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
+    PARTIAL: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
     RECEIVED: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
     CANCELLED: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30',
   }
@@ -78,6 +81,7 @@ export function PurchaseOrdersPanel({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [builderOpen, setBuilderOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<PoRow | null>(null)
+  const [receiveTarget, setReceiveTarget] = useState<PoRow | null>(null)
 
   const suppliers = useMemo<Supplier[]>(() => {
     const map = new Map<string, Supplier>()
@@ -118,21 +122,6 @@ export function PurchaseOrdersPanel({
       refreshAll()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to update purchase order')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function receive(po: PoRow) {
-    setBusyId(po.id)
-    try {
-      const updated = await api.post<PoRow>(`/api/purchase-orders/${po.id}/receive`, {})
-      toast.success(`Stock received for ${po.poNo}`, {
-        description: `${updated.items.length} item${updated.items.length === 1 ? '' : 's'} added to inventory`,
-      })
-      refreshAll()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to receive purchase order')
     } finally {
       setBusyId(null)
     }
@@ -197,12 +186,13 @@ export function PurchaseOrdersPanel({
           />
         ) : (
           <div className="overflow-x-auto">
-            <Table className="min-w-[860px]">
+            <Table className="min-w-[960px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-4">PO #</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead className="text-center">Items</TableHead>
+                  <TableHead className="hidden sm:table-cell">Received</TableHead>
                   <TableHead className="text-right">Order cost</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">Created</TableHead>
@@ -219,6 +209,9 @@ export function PurchaseOrdersPanel({
                       {po.supplier?.name ?? <span className="text-muted-foreground">Any supplier</span>}
                     </TableCell>
                     <TableCell className="text-center text-sm tabular-nums">{po.items.length}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <ReceivedCell items={po.items} status={po.status} />
+                    </TableCell>
                     <TableCell className="text-right text-sm font-semibold tabular-nums whitespace-nowrap">
                       {fmtMoney(po.totalCost ?? 0)}
                     </TableCell>
@@ -242,18 +235,19 @@ export function PurchaseOrdersPanel({
                             <Send className="size-3.5 text-amber-600 dark:text-amber-400" /> Mark ordered
                           </Button>
                         )}
-                        {(po.status === 'DRAFT' || po.status === 'ORDERED') && (
+                        {(po.status === 'DRAFT' || po.status === 'ORDERED' || po.status === 'PARTIAL') && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-8 border-emerald-500/40 hover:bg-emerald-500/10"
                             disabled={busyId === po.id}
-                            onClick={() => void receive(po)}
+                            onClick={() => setReceiveTarget(po)}
                           >
-                            <PackageCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" /> Receive
+                            <PackageCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                            {po.status === 'PARTIAL' ? 'Receive rest' : 'Receive'}
                           </Button>
                         )}
-                        {(po.status === 'DRAFT' || po.status === 'ORDERED') && (
+                        {(po.status === 'DRAFT' || po.status === 'ORDERED' || po.status === 'PARTIAL') && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -295,6 +289,13 @@ export function PurchaseOrdersPanel({
         onCreated={refreshAll}
       />
 
+      <ReceiveDialog
+        po={receiveTarget}
+        open={receiveTarget !== null}
+        onOpenChange={(o) => !o && setReceiveTarget(null)}
+        onReceived={() => refreshAll()}
+      />
+
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
@@ -306,6 +307,56 @@ export function PurchaseOrdersPanel({
       />
     </>
   )
+}
+
+// ── Received progress cell ──────────────────────────────────────────
+
+function ReceivedCell({
+  items,
+  status,
+}: {
+  items: PurchaseOrder['items']
+  status: PurchaseOrder['status']
+}) {
+  const ordered = items.reduce((s, it) => s + it.qty, 0)
+  const received = items.reduce((s, it) => s + (it.receivedQty ?? 0), 0)
+  const pct = Math.min(100, Math.round((received / Math.max(1, ordered)) * 100))
+  if (status === 'CANCELLED' && received === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>
+  }
+  return (
+    <div className="min-w-24 max-w-32" title={`${fmtQty(received)} of ${fmtQty(ordered)} units received`}>
+      <div className="mb-1 flex items-baseline justify-between text-[11px] tabular-nums">
+        <span className={pctTone(pct)}>{pct}%</span>
+        <span className="text-muted-foreground">
+          {fmtQty(received)}/{fmtQty(ordered)}
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={progressTone(pct)}
+          style={{ width: `${pct}%` }}
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="PO receive progress"
+        />
+      </div>
+    </div>
+  )
+}
+
+function pctTone(pct: number): string {
+  if (pct >= 100) return 'font-semibold text-emerald-600 dark:text-emerald-400'
+  if (pct > 0) return 'font-semibold text-amber-600 dark:text-amber-400'
+  return 'font-semibold text-muted-foreground'
+}
+
+function progressTone(pct: number): string {
+  if (pct >= 100) return 'h-full rounded-full bg-emerald-500 transition-all'
+  if (pct > 0) return 'h-full rounded-full bg-amber-500 transition-all'
+  return 'h-full rounded-full bg-transparent'
 }
 
 // ── Builder dialog ───────────────────────────────────────────────────────────

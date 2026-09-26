@@ -1,4 +1,4 @@
-// GET /api/reports?type=pnl|products|daily&from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/reports?type=pnl|products|daily|zreport|xreport&from=YYYY-MM-DD[&to=YYYY-MM-DD][&fromTime=HH:MM]
 // All boundaries are Dhaka day keys; dates default to the last 30 days.
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
@@ -24,7 +24,14 @@ export async function GET(req: NextRequest) {
     if (type === 'products') return NextResponse.json(await productPerformance(start, end))
     if (type === 'daily') return NextResponse.json(await dailyReport(start, end))
     if (type === 'zreport') return NextResponse.json(await zReport(fromKey))
-    return bad(`Unknown report type "${type}" (expected pnl | products | daily | zreport)`)
+    if (type === 'xreport') {
+      // X-Report = mid-shift snapshot of the given day from a start time (inclusive).
+      const raw = (sp.get('fromTime') ?? '00:00').trim()
+      const m = /^(\d{1,2}):(\d{2})$/.exec(raw)
+      if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return bad('fromTime must be HH:MM (00:00–23:59)')
+      return NextResponse.json(await zReport(fromKey, Number(m[1]) * 60 + Number(m[2])))
+    }
+    return bad(`Unknown report type "${type}" (expected pnl | products | daily | zreport | xreport)`)
   } catch (e) {
     console.error('GET /api/reports error:', e)
     return bad('Failed to build report', 500)
@@ -119,10 +126,15 @@ async function productPerformance(start: Date, end: Date) {
 }
 
 // ── Z-Report: single-day end-of-day summary (Dhaka day key) ────────────────
+// fromTimeMin (optional) shifts the window start — shared engine for X-Report.
 
-async function zReport(dateKey: string) {
-  const start = dayKeyToUTCStart(dateKey)
+async function zReport(dateKey: string, fromTimeMin?: number) {
+  const dayStart = dayKeyToUTCStart(dateKey)
   const end = dayKeyToUTCEnd(dateKey)
+  const start =
+    fromTimeMin !== undefined && fromTimeMin > 0
+      ? new Date(dayStart.getTime() + fromTimeMin * 60000)
+      : dayStart
 
   const [sales, expenses, items] = await Promise.all([
     db.sale.findMany({
@@ -203,9 +215,19 @@ async function zReport(dateKey: string) {
     .reduce((s, e) => s + e.amount, 0)
   const cashSales = methodMap.get('CASH')?.amount ?? 0
 
+  const windowLabel =
+    fromTimeMin !== undefined && fromTimeMin > 0
+      ? `${dayKeyLabel(dateKey)} · from ${String(Math.floor(fromTimeMin / 60)).padStart(2, '0')}:${String(fromTimeMin % 60).padStart(2, '0')}`
+      : dayKeyLabel(dateKey)
+
   return {
+    kind: fromTimeMin !== undefined && fromTimeMin > 0 ? 'X' : 'Z',
     date: dateKey,
-    label: dayKeyLabel(dateKey),
+    fromTime:
+      fromTimeMin !== undefined && fromTimeMin > 0
+        ? `${String(Math.floor(fromTimeMin / 60)).padStart(2, '0')}:${String(fromTimeMin % 60).padStart(2, '0')}`
+        : null,
+    label: windowLabel,
     transactions,
     itemsSold: round2(itemsSold),
     gross: round2(gross),

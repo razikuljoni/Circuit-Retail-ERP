@@ -34,11 +34,53 @@ import { fmtDate, fmtMoney, fmtQty, fmtTime } from '@/lib/format'
 import type { Category, Customer, Product, Sale } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
 import { cartTotals, usePosStore } from '@/store/pos'
+import { hashColor } from './products/colors'
 import { CartPanel } from '@/components/views/sales/cart-panel'
 import { CheckoutDialog } from '@/components/views/sales/checkout-dialog'
 import { ReceiptDialog } from '@/components/views/sales/receipt'
 
 const MAX_RENDER = 60
+
+/** Deterministic gradient tile with product initials — visual anchor per card. */
+function ProductThumb({ product }: { product: Product }) {
+  const color = hashColor(product.categoryId ?? product.sku)
+  const initials = product.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('')
+  return (
+    <span
+      aria-hidden
+      className="flex size-10 shrink-0 select-none items-center justify-center rounded-lg text-[13px] font-bold tracking-wide text-white shadow-sm ring-1 ring-black/5"
+      style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}B3 100%)` }}
+    >
+      {initials || '?'}
+    </span>
+  )
+}
+
+/** Stock-depth bar: full = ≥3× reorder level, amber = low, red = out. */
+function StockBar({ product }: { product: Product }) {
+  const out = product.stock <= 0
+  const low = !out && product.stock <= product.reorderLevel
+  const pct = Math.min(100, Math.round((product.stock / Math.max(1, product.reorderLevel * 3)) * 100))
+  return (
+    <span
+      className="block h-1 w-full overflow-hidden rounded-full bg-muted"
+      role="img"
+      aria-label={out ? 'Out of stock' : low ? 'Low stock' : 'In stock'}
+    >
+      <span
+        className={cn(
+          'block h-full rounded-full transition-all',
+          out ? 'bg-destructive' : low ? 'bg-amber-500' : 'bg-emerald-500/80'
+        )}
+        style={{ width: `${out ? 100 : Math.max(6, pct)}%` }}
+      />
+    </span>
+  )
+}
 
 function StockBadge({ product }: { product: Product }) {
   if (product.stock <= 0) {
@@ -328,19 +370,27 @@ export default function PosView() {
                         onClick={() => addItem(p)}
                         aria-label={`Add ${p.name} to sale`}
                         className={cn(
-                          'group flex min-h-24 flex-col gap-1 rounded-xl border bg-card p-2.5 text-left shadow-xs',
+                          'group flex min-h-[5.75rem] flex-col gap-1.5 rounded-xl border bg-card p-2.5 text-left shadow-xs',
                           'transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                           out
                             ? 'cursor-not-allowed opacity-50'
                             : 'hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/40 hover:shadow-md active:translate-y-0 active:shadow-xs'
                         )}
                       >
-                        <span className="line-clamp-2 min-h-8 text-xs font-medium leading-4">{p.name}</span>
-                        <span className="truncate font-mono text-[10px] text-muted-foreground">{p.sku}</span>
-                        <div className="mt-auto flex items-center justify-between gap-1 pt-1">
+                        <span className="flex items-start gap-2">
+                          <ProductThumb product={p} />
+                          <span className="min-w-0 flex-1">
+                            <span className="line-clamp-2 text-xs font-medium leading-4">{p.name}</span>
+                            <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
+                              {p.sku}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="mt-auto flex items-center justify-between gap-1">
                           <span className="text-sm font-bold tracking-tight">{fmtMoney(p.price)}</span>
                           <StockBadge product={p} />
-                        </div>
+                        </span>
+                        <StockBar product={p} />
                       </motion.button>
                     )
                   })}

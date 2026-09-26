@@ -235,7 +235,7 @@ export interface DailySalesRow {
 
 // ── Purchase orders ──
 
-export type PurchaseOrderStatus = 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED'
+export type PurchaseOrderStatus = 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED'
 
 export interface PurchaseOrderItem {
   id: string
@@ -245,6 +245,8 @@ export interface PurchaseOrderItem {
   name: string
   sku: string
   qty: number
+  /** Units already received across all deliveries */
+  receivedQty: number
   unitCost: number
 }
 
@@ -258,12 +260,18 @@ export interface PurchaseOrder {
   items: PurchaseOrderItem[]
   receivedAt?: string | null
   createdAt: string
+  /** Units moved in the latest receive call (receive response only) */
+  receivedNow?: number
 }
 
-// ── Z-Report (end-of-day) ──
+// ── Z-Report (end-of-day) / X-Report (shift snapshot) ──
 
 export interface ZReport {
+  /** 'X' when the window starts mid-day (shift snapshot), 'Z' for the full day */
+  kind: 'X' | 'Z'
   date: string
+  /** Shift start time HH:MM for X-Reports, null for Z-Reports */
+  fromTime: string | null
   label: string
   transactions: number
   itemsSold: number

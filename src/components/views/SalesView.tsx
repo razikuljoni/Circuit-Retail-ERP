@@ -15,6 +15,7 @@ import {
   Search,
   Smartphone,
   Tag,
+  Timer,
   TrendingUp,
   Undo2,
 } from 'lucide-react'
@@ -47,6 +48,7 @@ import { useApi } from '@/hooks/use-api'
 import { ReceiptDialog } from '@/components/views/sales/receipt'
 import { SaleDetailDialog } from '@/components/views/sales/sale-detail'
 import { ZReportDialog } from '@/components/views/sales/z-report'
+import { XReportDialog } from '@/components/views/sales/x-report'
 
 const PAGE_SIZE = 15
 
@@ -92,6 +94,7 @@ export default function SalesView() {
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [exporting, setExporting] = useState(false)
   const [zOpen, setZOpen] = useState(false)
+  const [xOpen, setXOpen] = useState(false)
 
   // Debounce the search box (350ms) before it hits the API.
   useEffect(() => {
@@ -234,6 +237,14 @@ export default function SalesView() {
         subtitle="Browse, reprint or refund completed sales"
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="h-10 border-sky-500/40 text-sky-700 hover:bg-sky-500/10 dark:text-sky-400"
+              onClick={() => setXOpen(true)}
+            >
+              <Timer className="size-4" aria-hidden />
+              X-Report
+            </Button>
             <Button variant="outline" className="h-10" onClick={() => setZOpen(true)}>
               <FileBarChart2 className="size-4" aria-hidden />
               Z-Report
@@ -528,6 +539,7 @@ export default function SalesView() {
       />
       <ReceiptDialog sale={receiptSale} onDone={() => setReceiptSale(null)} />
       <ZReportDialog open={zOpen} onOpenChange={setZOpen} />
+      <XReportDialog open={xOpen} onOpenChange={setXOpen} />
     </div>
   )
 }

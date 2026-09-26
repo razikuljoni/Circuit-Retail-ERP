@@ -141,15 +141,16 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id        String        @id @default(cuid())
-  poId      String
-  po        PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name      String // snapshot
-  sku       String // snapshot
-  qty       Float
-  unitCost  Float         @default(0)
+  id          String        @id @default(cuid())
+  poId        String
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String // snapshot
+  sku         String // snapshot
+  qty         Float
+  receivedQty Float         @default(0) // units already received across deliveries
+  unitCost    Float         @default(0)
 }
 
 // ─────────────── Expenses ───────────────

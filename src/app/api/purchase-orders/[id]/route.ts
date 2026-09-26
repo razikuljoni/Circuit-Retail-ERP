@@ -56,6 +56,9 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     })
     if (!existing) return bad('Purchase order not found', 404)
     if (existing.status === 'RECEIVED') return bad('Received purchase orders cannot be edited')
+    if (existing.status === 'PARTIAL' && body.items) {
+      return bad('Partially received purchase orders cannot be edited — receive or cancel instead')
+    }
 
     const data: {
       supplierId?: string | null

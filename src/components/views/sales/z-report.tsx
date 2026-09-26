@@ -1,7 +1,8 @@
 'use client'
 
-// ── Z-Report (end-of-day) — single-day register summary, printable ───────────
+// ── Z-Report (end-of-day) / X-Report (shift snapshot) shared body ──────────
 // Data: GET /api/reports?type=zreport&from=YYYY-MM-DD (Dhaka day key)
+//       GET /api/reports?type=xreport&from=YYYY-MM-DD&fromTime=HH:MM
 import { useState } from 'react'
 import {
   Banknote,
@@ -48,6 +49,11 @@ export function ZReportDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+export const REPORT_META: Record<'X' | 'Z', { title: string; icon: typeof FileBarChart2; blurb: string }> = {
+  X: { title: 'X-Report — shift snapshot', icon: FileBarChart2, blurb: 'Mid-shift register read' },
+  Z: { title: 'Z-Report — end of day', icon: FileBarChart2, blurb: 'Register-style daily summary' },
 }
 
 function ZReportForm({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
@@ -121,7 +127,7 @@ function ZReportForm({ onOpenChange }: { onOpenChange: (open: boolean) => void }
   )
 }
 
-function ZReportBody({
+export function ZReportBody({
   report,
   maxHourly,
   symbol,
@@ -132,12 +138,13 @@ function ZReportBody({
   symbol: string
   printHeader?: boolean
 }) {
+  const kind = report.kind ?? 'Z'
   return (
     <div className="space-y-4">
       {printHeader && (
         <div className="border-b pb-2">
           <p className="flex items-center gap-1.5 text-sm font-bold">
-            <Store className="size-3.5" /> Z-Report · End of Day
+            <Store className="size-3.5" /> {kind === 'X' ? 'X-Report · Shift Snapshot' : 'Z-Report · End of Day'}
           </p>
           <p className="text-xs">{report.label} — Circuit Retail ERP</p>
         </div>
@@ -145,7 +152,7 @@ function ZReportBody({
 
       {/* Headline totals */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <ZrStat label="Net sales" value={fmtMoney(report.netSales)} strong />
+        <ZrStat label={kind === 'X' ? 'Sales this shift' : 'Net sales'} value={fmtMoney(report.netSales)} strong />
         <ZrStat label="Gross sales" value={fmtMoney(report.gross)} />
         <ZrStat label="Discounts" value={fmtMoney(report.discounts)} />
         <ZrStat

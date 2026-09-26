@@ -384,3 +384,42 @@ Stage Summary:
 
 Recommended next phase:
 - X-report (cashier shift close) from Sales view; PO receive with per-line partial quantities; supplier statement email/export; product images; multi-user/auth pass; dashboard auto-refresh indicator polish
+
+---
+Task ID: 14 (cron round 7)
+Agent: Z (main)
+Task: Status assessment + agent-browser QA + new features (X-Report shift snapshot, PO per-line partial receive, dashboard live countdown w/ pause, POS product thumbnails + stock bars) + styling polish
+
+Work Log — status assessment:
+- Baseline healthy at start: all 10 views render with 0 console errors (desktop 1280 + mobile 390), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s
+- POS golden path re-verified live (add-to-cart → ৳560 total). Decision: no bugs found → new-feature development from plan backlog
+
+Work Log — new features shipped:
+1. X-REPORT (SHIFT SNAPSHOT): backend GET /api/reports?type=xreport&from=YYYY-MM-DD&fromTime=HH:MM — zReport engine refactored to accept fromTimeMin (window start = day start + minutes); response gains kind:'X'|'Z', fromTime, label "27 Sep · from 09:00"; validation rejects bad HH:MM (400). Frontend sales/x-report.tsx: sky-accented dialog with shift presets (Morning 09:00 / Evening 17:00 / Last 8 hours), date + time inputs, reuses exported ZReportBody (kind-aware titles: "Sales this shift", print header "X-Report · Shift Snapshot"), same printing-zreport print CSS + clone. Entry: sky "X-Report" button in Sales header (left of Z-Report). Browser-verified: 09:00 → ৳0 (sales were 00:20–01:20 AM), custom 00:15 → ৳6,380 (correctly excludes the earlier ৳560 sale); print trigger verified with stubbed window.print; Z-report unchanged (kind Z)
+2. PO PER-LINE PARTIAL RECEIVE: Prisma PurchaseOrderItem.receivedQty Float @default(0) pushed; receive route rewritten — body {lines:[{productId, qty, unitCost?}]} where qty = THIS delivery, up-front validation (no over-receive, no negative, nothing-to-receive guard), per-line receivedQty increment + PURCHASE movements + cost update, status recomputed: all→RECEIVED / some→PARTIAL / none→unchanged; PUT route now blocks item edits on PARTIAL POs. New inventory/receive-dialog.tsx: per-line Ordered/Received/Now columns, clamped receiving inputs, unit-cost override, per-line delivery progress bars (amber in-progress → emerald done), Fill remaining / Clear buttons, live "This delivery (at cost)" total, Receive all vs Receive delivery button label. PO table: new Received column (% + n/n + progress bar), cyan PARTIAL badge, "Receive rest" button label, min-w 960. Browser-verified full cycle on PO-20260927-0006: receive 4/10 → toast + 40% amber bar + PARTIAL → receive rest 6 → RECEIVED 10/10; ledger shows both movements (4: 6→10, 6: 10→16)
+   - REAL BUG (caught by own E2E, fixed): reopening the receive dialog kept stale qtyNow because prop-driven open doesn't fire Dialog onOpenChange → initFrom moved to a useEffect on [open, po]; verified NOW defaults to remaining (6) on reopen
+3. DASHBOARD LIVE COUNTDOWN + PAUSE: DashboardView now drives refresh via its own 60s countdown (exact sync — fires refetch at 0, resets on completion) instead of useApi pollMs; header shows LIVE pill with SVG countdown ring (stroke-dashoffset animated, emerald), pause/resume toggle (amber dot + "LIVE PAUSED" when paused), manual refresh keeps ring reset. Browser-verified countdown ticking (59s), pause → LIVE PAUSED → resume → LIVE
+4. POS PRODUCT THUMBNAILS + STOCK BARS: new ProductThumb (deterministic hashColor gradient tile, 135° fade, product initials, ring) on every POS product card + new StockBar (stock vs 3× reorder level: emerald healthy / amber low / red out at 100% width) at card bottom; card layout reworked (thumb left, name+sku right, price+badge, bar). Cart line items get matching mini CartThumb keyed off SKU for cohesion. Browser-verified desktop + mobile 390 (2-col grid, thumbnails + amber low bar visible), cart shows AP/CB thumbs matching grid
+
+Work Log — styling polish (mandatory):
+- X-Report button sky-tinted outline (border-sky-500/40 + hover fill) distinguishing it from Z-Report
+- Receive dialog: emerald chip icon in title, sticky table header with backdrop-blur, muted/60 summary strip, clamped inputs with aria labels
+- PO table Received column color-logic (emerald ≥100%, amber >0, muted 0) + title tooltips
+- POS cards: min-h tightened to 5.75rem, gap rhythm 1.5, thumbnails ring-1 ring-black/5 for dark-mode depth
+- Dashboard ring: -rotate-90 SVG with ease-linear transition — reads as a clock draining toward refresh
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+- agent-browser: 10-view sweep 0 console errors (desktop + mobile); X-report data/print verified; partial receive full cycle verified incl. reopen-defaults bug fix; dashboard pause/resume verified; POS add-to-cart with new cards verified (৳650 2-item cart) then cart cleared
+- API curl suite: xreport happy path + 400 validation + kind/label/fromTime fields; purchase-orders list shows receivedQty persisted
+- dev.log: all 200s/400-as-designed, no compile errors
+- Demo data delta: PO-20260927-0006 now RECEIVED (receivedQty 10/10), Bluetooth Speaker X15 stock 6→16 (no longer low; STA-002 pen remains low for badge demos), 2 new PURCHASE movements in ledger — realistic completed-PO demo state
+
+Stage Summary:
+- Backend surface added: xreport type in /api/reports (fromTime param, kind/fromTime fields); receive route rewritten for per-line partial deliveries with receivedQty tracking; PurchaseOrderItem.receivedQty column; PUT route PARTIAL edit guard
+- Frontend: x-report.tsx, receive-dialog.tsx; z-report.tsx exports ZReportBody (kind-aware); SalesView X-Report button; purchase-orders.tsx Received column + dialog wiring; DashboardView countdown/pause; PosView + cart-panel thumbnails/bars
+- Known limitations: X-report covers a single Dhaka day only (overnight shifts spanning midnight need two X-reports); "Last 8 hours" preset clamps to today's window (post-midnight use shows only today's slice); partial receive UI assumes one open delivery per line at a time
+- Schema note: receivedQty defaults 0 — existing RECEIVED POs (0001, PO-20260926-0001) show 0% received bars; cosmetic only (status RECEIVED renders emerald regardless)
+
+Recommended next phase:
+- Receipt/receive-note printing for partial deliveries (GRN print), supplier statement to include receivedQty line progress, stocktake session persistence server-side, product images upload, multi-user/auth pass, cashier shift (X-report auto-open on POS login) tracking
