@@ -24,6 +24,7 @@ import { PageHeader, EmptyState, ErrorState, ViewLoader } from '@/components/sha
 import { StatCard } from '@/components/shared/stat-card'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ExpenseDialog } from './expenses/expense-dialog'
+import { AttachmentThumb } from './expenses/attachment-thumb'
 import { CategoryDialog } from './expenses/category-dialog'
 import { TemplatesDialog } from './expenses/templates-dialog'
 import { METHOD_META, METHODS } from './expenses/method-meta'
@@ -265,6 +266,7 @@ export default function ExpensesView() {
                                     </p>
                                   )}
                                 </div>
+                                <AttachmentThumb expense={e} />
                                 <div className="flex items-center gap-2 shrink-0">
                                   <div className="text-right">
                                     <p className="text-sm font-bold tabular-nums">{fmtMoney(e.amount)}</p>

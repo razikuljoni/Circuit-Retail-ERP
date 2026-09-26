@@ -192,6 +192,8 @@ model Expense {
   spentAt         DateTime        @default(now())
   reference       String?
   note            String?
+  /// Optional receipt photo (http(s) URL or data:image URI) — Expense receipt attachment
+  attachment      String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 }

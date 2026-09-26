@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { bad, zodMsg } from '@/lib/api-utils'
+import { bad, zodMsg, isValidImageUrl } from '@/lib/api-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +17,13 @@ const putSchema = z.object({
   spentAt: z.string().optional(),
   reference: z.string().trim().max(80).optional().nullable(),
   note: z.string().max(1000).optional().nullable(),
+  attachment: z
+    .string()
+    .trim()
+    .max(450_000)
+    .refine((u) => u === '' || isValidImageUrl(u), 'Attachment must be an http(s) or data:image URL')
+    .optional()
+    .nullable(),
 })
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
@@ -40,6 +47,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
         ...body,
         spentAt,
         categoryId: body.categoryId === undefined ? undefined : body.categoryId || null,
+        attachment: body.attachment === undefined ? undefined : body.attachment || null, // '' → null
       },
       include: { category: true },
     })

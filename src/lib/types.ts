@@ -133,6 +133,8 @@ export interface Expense {
   spentAt: string
   reference?: string | null
   note?: string | null
+  /** Optional receipt photo (http(s) URL or data:image URI) — additive */
+  attachment?: string | null
 }
 
 export interface StoreSettings {
@@ -170,6 +172,10 @@ export interface CashDrawer {
 }
 
 export interface DashboardData {
+  /** Dhaka day-key being viewed (additive, from API) — equals today's key on the live view */
+  viewDate?: string
+  /** True when the viewed day is the current Dhaka day (additive, from API) */
+  isToday?: boolean
   today: {
     sales: number
     transactions: number
@@ -348,6 +354,45 @@ export interface StocktakeResult {
     after: number
     delta: number
   }[]
+}
+
+// ── Product detail (GET /api/products/[id]/detail, additive) ──
+
+export interface ProductSaleEntry {
+  saleId: string
+  invoiceNo: string
+  qty: number
+  unitPrice: number
+  discount: number
+  tax: number
+  total: number
+  costPrice: number
+  lineProfit: number
+  paymentMethod: PaymentMethod
+  status: SaleStatus
+  customerName?: string | null
+  createdAt: string
+}
+
+export interface ProductDetailStats {
+  unitsSold30d: number
+  revenue30d: number
+  profit30d: number
+  orders30d: number
+  stockCostValue: number
+  stockRetailValue: number
+  marginPct: number | null
+  avgDailyQty7d: number
+  daysCover: number | null
+}
+
+export interface ProductDetail {
+  product: Product
+  stats: ProductDetailStats
+  /** Last 12 sale lines containing this product (most recent first) */
+  recentSales: ProductSaleEntry[]
+  /** Last 15 stock movements for this product (most recent first) */
+  movements: StockMovement[]
 }
 
 // ── Supplier statement (GET /api/suppliers/[id]/statement, additive) ──

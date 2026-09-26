@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatCard, StatCardSkeleton } from '@/components/shared/stat-card'
-import { fmtMoney, fmtMoneyInt } from '@/lib/format'
+import { fmtDate, fmtMoney, fmtMoneyInt } from '@/lib/format'
 import type { DashboardData } from '@/lib/types'
 
 const QUICK_ACTIONS = [
@@ -45,7 +45,7 @@ function pctDelta(current: number, previous: number): number | undefined {
 export function DashboardKpis({ data, loading }: { data: DashboardData | null; loading: boolean }) {
   if (loading || !data) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}
@@ -54,6 +54,10 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
   }
 
   const { today, yesterday, stockValue } = data
+  // Historical review (?date=): titles name the viewed day instead of "today".
+  const historical = data.isToday === false
+  const dayTitle = (todayBase: string, pastBase: string) =>
+    historical && data.viewDate ? `${pastBase} (${fmtDate(data.viewDate)})` : todayBase
   const salesTrend = pctDelta(today.sales, yesterday.sales)
   const profitTrend = pctDelta(today.grossProfit, yesterday.grossProfit)
   const expTrend = pctDelta(today.expenses, yesterday.expenses)
@@ -62,9 +66,9 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
   const netPositive = today.netProfit >= 0
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
       <StatCard
-        title="Today Sales"
+        title={dayTitle('Today Sales', 'Sales')}
         animatedValue={{ value: today.sales, format: (n) => fmtMoneyInt(n) }}
         icon={Banknote}
         trend={salesTrend !== undefined ? { value: salesTrend } : undefined}
@@ -88,7 +92,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         accent="bg-gradient-to-r from-emerald-500/80 to-transparent"
       />
       <StatCard
-        title="Expenses Today"
+        title={dayTitle('Expenses Today', 'Expenses')}
         animatedValue={{ value: today.expenses, format: (n) => fmtMoneyInt(n) }}
         icon={Wallet}
         trend={expTrend !== undefined ? { value: expTrend } : undefined}

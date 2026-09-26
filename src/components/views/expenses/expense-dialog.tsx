@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, ImageOff, ImagePlus, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { dhakaDateKey, dayKeyToUTCStart, startOfDayUTC, toDateInputValue } from '@/lib/format'
 import type { Expense, ExpenseCategory, PaymentMethod } from '@/lib/types'
@@ -37,6 +37,8 @@ export function ExpenseDialog({
   const [dateKey, setDateKey] = useState(() => toDateInputValue(new Date()))
   const [reference, setReference] = useState('')
   const [note, setNote] = useState('')
+  const [attachment, setAttachment] = useState('')
+  const [attachmentBroken, setAttachmentBroken] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function ExpenseDialog({
       setDateKey(toDateInputValue(expense.spentAt))
       setReference(expense.reference ?? '')
       setNote(expense.note ?? '')
+      setAttachment(expense.attachment ?? '')
     } else {
       setTitle('')
       setAmount('')
@@ -57,7 +60,9 @@ export function ExpenseDialog({
       setDateKey(toDateInputValue(new Date()))
       setReference('')
       setNote('')
+      setAttachment('')
     }
+    setAttachmentBroken(false)
   }, [open, expense])
 
   async function submit() {
@@ -69,6 +74,13 @@ export function ExpenseDialog({
     }
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error('Amount must be greater than 0')
+      return
+    }
+
+    // Light client-side shape check (server enforces the same rule)
+    const att = attachment.trim()
+    if (att && !/^(https?:\/\/.+|data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,[\s\S]+)$/i.test(att)) {
+      toast.error('Attachment must be an http(s) or data:image URL')
       return
     }
 
@@ -94,6 +106,7 @@ export function ExpenseDialog({
         spentAt: spentAt.toISOString(),
         reference: reference.trim() || null,
         note: note.trim() || null,
+        attachment: att || null, // '' → null (also clears an existing attachment on edit)
       }
       if (isEdit) {
         await api.put(`/api/expenses/${expense.id}`, payload)
@@ -204,6 +217,62 @@ export function ExpenseDialog({
           <div className="space-y-1.5">
             <Label htmlFor="e-note">Note</Label>
             <Textarea id="e-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional details" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="e-attachment">Receipt attachment</Label>
+            <div className="flex items-start gap-3">
+              {attachment && !attachmentBroken ? (
+                <img
+                  src={attachment}
+                  alt="Receipt preview"
+                  className="size-14 shrink-0 rounded-md border object-cover"
+                  onError={() => setAttachmentBroken(true)}
+                />
+              ) : (
+                <span className="flex size-14 shrink-0 items-center justify-center rounded-md border border-dashed bg-muted/30">
+                  {attachmentBroken ? (
+                    <ImageOff className="size-5 text-muted-foreground" aria-hidden />
+                  ) : (
+                    <ImagePlus className="size-5 text-muted-foreground" aria-hidden />
+                  )}
+                </span>
+              )}
+              <div className="min-w-0 flex-1 space-y-1">
+                <Input
+                  id="e-attachment"
+                  value={attachment}
+                  onChange={(e) => {
+                    setAttachment(e.target.value)
+                    setAttachmentBroken(false)
+                  }}
+                  placeholder="https://… or data:image…"
+                  className="font-mono text-xs"
+                  autoComplete="off"
+                />
+                <div className="flex min-h-[28px] items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    {attachment && attachmentBroken
+                      ? 'Invalid image URL'
+                      : 'Optional receipt photo — shown as a thumbnail on the expense row.'}
+                  </p>
+                  {attachment && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        setAttachment('')
+                        setAttachmentBroken(false)
+                      }}
+                    >
+                      <X className="size-3" aria-hidden /> Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

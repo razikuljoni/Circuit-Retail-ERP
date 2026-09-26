@@ -34,6 +34,7 @@ import { useDebouncedValue } from './products/use-debounced-value'
 import { ProductDialog } from './products/product-dialog'
 import { LabelSheet } from './products/label-sheet'
 import { ImportDialog } from './products/import-dialog'
+import { ProductDetailDrawer } from './products/product-detail-drawer'
 
 type Quick = 'all' | 'low' | 'out'
 type SortKey = 'name' | 'stock' | 'price'
@@ -111,6 +112,7 @@ export default function ProductsView() {
   const [labelTarget, setLabelTarget] = useState<Product | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   function openCreate() {
     setEditing(null)
@@ -350,7 +352,12 @@ export default function ProductsView() {
                         <TableRow key={p.id}>
                           <TableCell className="font-mono text-xs whitespace-nowrap">{p.sku}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded-md text-left transition-colors outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                              aria-label={`View details for ${p.name}`}
+                              onClick={() => setDetailId(p.id)}
+                            >
                               <ProductAvatar
                                 name={p.name}
                                 sku={p.sku}
@@ -366,7 +373,7 @@ export default function ProductsView() {
                                   <div className="font-mono text-[11px] text-muted-foreground">{p.barcode}</div>
                                 )}
                               </div>
-                            </div>
+                            </button>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
                             {p.category ? (
@@ -461,6 +468,19 @@ export default function ProductsView() {
           </Card>
         </>
       )}
+
+      <ProductDetailDrawer
+        productId={detailId}
+        onOpenChange={(o) => !o && setDetailId(null)}
+        onEdit={(p) => {
+          setDetailId(null)
+          openEdit(p)
+        }}
+        onPrintLabel={(p) => {
+          setDetailId(null)
+          setLabelTarget(p)
+        }}
+      />
 
       {labelTarget && (
         <LabelSheet

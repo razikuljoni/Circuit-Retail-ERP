@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { bad, zodMsg, round2, isDayKey, numParam } from '@/lib/api-utils'
+import { bad, zodMsg, round2, isDayKey, numParam, isValidImageUrl } from '@/lib/api-utils'
 import { dayKeyToUTCStart, dayKeyToUTCEnd } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -87,6 +87,13 @@ const postSchema = z.object({
   spentAt: z.string().optional(),
   reference: z.string().trim().max(80).optional().nullable(),
   note: z.string().max(1000).optional().nullable(),
+  attachment: z
+    .string()
+    .trim()
+    .max(450_000)
+    .refine((u) => u === '' || isValidImageUrl(u), 'Attachment must be an http(s) or data:image URL')
+    .optional()
+    .nullable(),
 })
 
 export async function POST(req: NextRequest) {
@@ -109,6 +116,7 @@ export async function POST(req: NextRequest) {
         spentAt,
         reference: body.reference ?? null,
         note: body.note ?? null,
+        attachment: body.attachment || null, // '' → null
       },
       include: { category: true },
     })

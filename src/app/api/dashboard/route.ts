@@ -1,4 +1,8 @@
 // GET /api/dashboard — single JSON matching DashboardData (src/lib/types.ts)
+// Optional ?date=YYYY-MM-DD (Dhaka day-key) reviews a past day instead of live today:
+// the `today` KPI block becomes the selected day, `yesterday` becomes its previous day
+// (so all "% vs yesterday" comparisons keep working unchanged). Trend/top-products stay
+// relative to today; hourly/payment-mix/cash-drawer follow the selected day.
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import {
@@ -6,26 +10,50 @@ import {
   hourLabel,
   dayKeyLabel,
   dhakaHour,
+  isDayKey,
+  bad,
 } from '@/lib/api-utils'
 import {
   startOfTodayUTC,
   addDaysUTC,
   dhakaDateKey,
+  dayKeyToUTCStart,
+  dayKeyToUTCEnd,
 } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    // ── Optional ?date= review param (format-valid + real calendar day) ──
+    const dateParam = new URL(req.url).searchParams.get('date')
+    if (
+      dateParam !== null &&
+      (!isDayKey(dateParam) || dhakaDateKey(dayKeyToUTCStart(dateParam)) !== dateParam)
+    ) {
+      return bad('Invalid date — expected YYYY-MM-DD')
+    }
+
     const todayStart = startOfTodayUTC()
     const tomorrow = addDaysUTC(todayStart, 1)
-    const yesterdayStart = addDaysUTC(todayStart, -1)
     const d7Start = addDaysUTC(todayStart, -6)
     const d14Start = addDaysUTC(todayStart, -13)
 
-    // ── One fetch for 14 days of sales (with item snapshots) ──
+    // ── Selected day: today (no param, backwards compatible) or the ?date= Dhaka day ──
+    const viewDate = dateParam ?? dhakaDateKey(todayStart)
+    const isToday = viewDate === dhakaDateKey(todayStart)
+    const selStart = isToday ? todayStart : dayKeyToUTCStart(viewDate)
+    const selEnd = isToday ? tomorrow : dayKeyToUTCEnd(viewDate)
+    const prevStart = addDaysUTC(selStart, -1) // previous Dhaka day of the selection
+    const prevEnd = selStart
+
+    // Fetch window covers the 14-day trend AND the selected + previous day
+    const windowStart = new Date(Math.min(d14Start.getTime(), prevStart.getTime()))
+    const windowEnd = new Date(Math.max(tomorrow.getTime(), selEnd.getTime()))
+
+    // ── One fetch for the whole window of sales (with item snapshots) ──
     const sales = await db.sale.findMany({
-      where: { createdAt: { gte: d14Start, lt: tomorrow } },
+      where: { createdAt: { gte: windowStart, lt: windowEnd } },
       select: {
         id: true,
         createdAt: true,
@@ -40,13 +68,13 @@ export async function GET() {
       },
     })
 
-    // ── 14 days of expenses ──
+    // ── Same window of expenses ──
     const expenses = await db.expense.findMany({
-      where: { spentAt: { gte: d14Start, lt: tomorrow } },
+      where: { spentAt: { gte: windowStart, lt: windowEnd } },
       select: { amount: true, spentAt: true, paymentMethod: true },
     })
 
-    // ── Today + yesterday aggregates (from the 14-day fetch) ──
+    // ── Selected-day + previous-day aggregates (from the window fetch) ──
     let tSales = 0, tTx = 0, tProfit = 0, tDiscounts = 0, tRefunds = 0
     let ySales = 0, yTx = 0, yProfit = 0
     const hourlySales = Array(24).fill(0)
@@ -55,11 +83,11 @@ export async function GET() {
 
     for (const s of sales) {
       const at = s.createdAt.getTime()
-      const isToday = at >= todayStart.getTime() && at < tomorrow.getTime()
-      const isYesterday = at >= yesterdayStart.getTime() && at < todayStart.getTime()
+      const isSel = at >= selStart.getTime() && at < selEnd.getTime()
+      const isPrevDay = at >= prevStart.getTime() && at < prevEnd.getTime()
       const completed = s.status === 'COMPLETED'
 
-      if (isToday && completed) {
+      if (isSel && completed) {
         tSales += s.total
         tTx += 1
         tProfit += s.profit
@@ -72,10 +100,10 @@ export async function GET() {
         m.count += 1
         payMix.set(s.paymentMethod, m)
       }
-      if (isToday && s.status === 'REFUNDED') {
+      if (isSel && s.status === 'REFUNDED') {
         tRefunds += s.total
       }
-      if (isYesterday && completed) {
+      if (isPrevDay && completed) {
         ySales += s.total
         yTx += 1
         yProfit += s.profit
@@ -84,15 +112,15 @@ export async function GET() {
 
     let tExpenses = 0
     let yExpenses = 0
-    let todayCashExpenses = 0
+    let selCashExpenses = 0
     const dailyExpenses = new Map<string, number>()
     for (const e of expenses) {
       const at = e.spentAt.getTime()
-      if (at >= todayStart.getTime() && at < tomorrow.getTime()) {
+      if (at >= selStart.getTime() && at < selEnd.getTime()) {
         tExpenses += e.amount
-        if (e.paymentMethod === 'CASH') todayCashExpenses += e.amount
+        if (e.paymentMethod === 'CASH') selCashExpenses += e.amount
       }
-      if (at >= yesterdayStart.getTime() && at < todayStart.getTime()) yExpenses += e.amount
+      if (at >= prevStart.getTime() && at < prevEnd.getTime()) yExpenses += e.amount
       const key = dhakaDateKey(e.spentAt)
       dailyExpenses.set(key, (dailyExpenses.get(key) ?? 0) + e.amount)
     }
@@ -100,8 +128,8 @@ export async function GET() {
     const cashSales = payMix.get('CASH')?.amount ?? 0
     const cashDrawer = {
       cashSales: round2(cashSales),
-      cashExpenses: round2(todayCashExpenses),
-      expectedCash: round2(cashSales - todayCashExpenses),
+      cashExpenses: round2(selCashExpenses),
+      expectedCash: round2(cashSales - selCashExpenses),
     }
 
     const today = {
@@ -122,7 +150,7 @@ export async function GET() {
       expenses: round2(yExpenses),
     }
 
-    // ── Hourly buckets (today, Dhaka hours) ──
+    // ── Hourly buckets (selected day, Dhaka hours) ──
     const hourly = Array.from({ length: 24 }, (_, h) => ({
       hour: String(h),
       label: hourLabel(h),
@@ -130,7 +158,7 @@ export async function GET() {
       transactions: hourlyTx[h],
     }))
 
-    // ── Last 14 Dhaka days ascending ──
+    // ── Last 14 Dhaka days ascending (always relative to TODAY — unchanged) ──
     const daily: { date: string; label: string; sales: number; expenses: number; profit: number }[] = []
     const dailyProfitMap = new Map<string, number>()
     for (const s of sales) {
@@ -154,12 +182,12 @@ export async function GET() {
       })
     }
 
-    // ── Payment mix (today, COMPLETED) ──
+    // ── Payment mix (selected day, COMPLETED) ──
     const paymentMix = [...payMix.entries()]
       .map(([method, v]) => ({ method, amount: round2(v.amount), count: v.count }))
       .sort((a, b) => b.amount - a.amount)
 
-    // ── Top products (last 7 days, COMPLETED, by qty) ──
+    // ── Top products (last 7 days relative to TODAY — unchanged, COMPLETED, by qty) ──
     const topMap = new Map<string, { qty: number; revenue: number }>()
     for (const s of sales) {
       if (s.status !== 'COMPLETED') continue
@@ -176,7 +204,7 @@ export async function GET() {
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5)
 
-    // ── Recent lists ──
+    // ── Recent lists (global latest — kept as-is) ──
     const [recentSales, recentExpenses] = await Promise.all([
       db.sale.findMany({
         orderBy: { createdAt: 'desc' },
@@ -246,6 +274,8 @@ export async function GET() {
       lowStock,
       stockValue,
       cashDrawer,
+      viewDate,
+      isToday,
     })
   } catch (e) {
     console.error('GET /api/dashboard error:', e)

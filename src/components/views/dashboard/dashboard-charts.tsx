@@ -28,7 +28,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { EmptyState } from '@/components/shared/page-bits'
-import { fmtMoney, fmtQty } from '@/lib/format'
+import { fmtDate, fmtMoney, fmtQty } from '@/lib/format'
 import type { DashboardData } from '@/lib/types'
 
 // Theme vars are raw oklch values in globals.css → use `var(--chart-N)` directly.
@@ -96,11 +96,14 @@ export function HourlySalesCard({ data, loading }: { data: DashboardData | null;
     [data]
   )
   const hasSales = (data?.hourly ?? []).some((h) => h.transactions > 0 || h.sales > 0)
+  // Historical review (?date=): label names the viewed day instead of "today".
+  const historical = data?.isToday === false
+  const viewLabel = historical && data?.viewDate ? fmtDate(data.viewDate) : null
 
   return (
     <ChartCard
       loading={loading}
-      title="Sales by hour (today)"
+      title={viewLabel ? `Sales by hour (${viewLabel})` : 'Sales by hour (today)'}
       description="Revenue distribution across Dhaka business hours"
       // span 2/3 on large screens, set by parent grid ordering
     >
@@ -132,7 +135,7 @@ export function HourlySalesCard({ data, loading }: { data: DashboardData | null;
       ) : (
         <EmptyState
           icon={ShoppingBag}
-          title="No sales yet today"
+          title={viewLabel ? `No sales on ${viewLabel}` : 'No sales yet today'}
           message="Hourly revenue will appear here as soon as the first transaction lands."
           className="py-8"
         />
@@ -165,9 +168,16 @@ export function PaymentMixCard({ data, loading }: { data: DashboardData | null; 
     [mix]
   )
   const methodLabels = useMemo(() => Object.fromEntries(mix.map((m) => [m.method, m.method])), [mix])
+  // Historical review (?date=): label names the viewed day instead of "today".
+  const historical = data?.isToday === false
+  const viewLabel = historical && data?.viewDate ? fmtDate(data.viewDate) : null
 
   return (
-    <ChartCard loading={loading} title="Payment mix (today)" description="How customers paid today">
+    <ChartCard
+      loading={loading}
+      title={viewLabel ? `Payment mix (${viewLabel})` : 'Payment mix (today)'}
+      description={viewLabel ? `How customers paid on ${viewLabel}` : 'How customers paid today'}
+    >
       {mix.length > 0 ? (
         <div>
           <ChartContainer config={config} className="mx-auto h-[200px] w-full">
@@ -211,7 +221,7 @@ export function PaymentMixCard({ data, loading }: { data: DashboardData | null; 
       ) : (
         <EmptyState
           icon={CreditCard}
-          title="No payments today"
+          title={viewLabel ? 'No payments that day' : 'No payments today'}
           message="The donut fills up with today's cash, card and mobile splits."
           className="py-8"
         />

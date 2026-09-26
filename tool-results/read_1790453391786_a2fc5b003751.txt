@@ -1,0 +1,200 @@
+     1→
+     2→Stage Summary:
+     3→- App now covers the full retail loop including purchasing and receivables: POS (cash/card/mobile + credit) → invoices/refunds → stock ledger → purchase orders → suppliers; expenses; dashboard + Z-report + P&L
+     4→- New backend surface: /api/purchase-orders (+[id], +[id]/receive), /api/sales/[id]/settle, /api/customers/[id]/settle-all, /api/reports?type=zreport; customers/sales responses extended with totalDue/due
+     5→- Known limitations: PO receive uses PO quantities (per-line overrides only via API body); settle uses "amount: MAX_SAFE_INTEGER" from UI for full settlement (server caps — partial UI settle possible via API); Z-report print layout is A4-oriented (thermal receipt style remains for invoices)
+     6→
+     7→Recommended next phase:
+     8→- Supplier-level PO grouping UX (one PO per supplier from a single click on dashboard low-stock strip), PO PDF/receipt print, customer credit LIMITS + aging report, expense attachments, PDF/Excel report export, bulk product import CSV parser, multi-user/auth pass
+     9→
+    10→---
+    11→Task ID: 11 (cron round 4)
+    12→Agent: Z (main)
+    13→Task: Status assessment + agent-browser QA + 3 new features (bulk CSV import, credit limits + aging, one-click draft POs) + styling polish
+    14→
+    15→Work Log — status assessment:
+    16→- Baseline healthy: all 10 views render live data, 0 console errors (agent-browser sweep desktop + mobile), lint 0 errors, all API 200; POS golden path re-verified in-browser (cart build → totals → Charge enabled)
+    17→- App had evolved past worklog round 3 with POs/Z-report/cash-drawer already live (documented); dev server was stale-cached after schema push → restarted via (setsid bun run dev &) double-fork
+    18→
+    19→Work Log — bugs found & fixed:
+    20→1. REAL BUG (pre-existing): GET /api/products?lowStock=1 pre-filtered SQL to stock<=0, so "low but positive" products never matched and the JS refinement (stock<=reorderLevel) was dead code for them. Products view "Low" toggle + anything using lowStock=1 silently missed low-stock-but-positive items. Fixed: no SQL stock pre-filter when lowStock=1, full scan then JS filter, limit applied after; outOfStock keeps SQL filter. Verified: returns both demo low items (13/15, 6/8)
+    21→
+    22→Work Log — new features shipped:
+    23→1. BULK PRODUCT IMPORT: new POST /api/products/import (up to 500 rows, zod-validated per row with per-row errors, in-file duplicate SKU/barcode detection, cost>price rejection, category match-or-autocreate by name, supplier match by name, SKU collision modes skip|update, transactional with IMPORT StockMovement rows, auto SKU generation when missing). New products/import-csv.ts (dependency-free CSV parser: quotes/escaped quotes, CRLF, delimiter sniffing comma/tab/semicolon, header aliases name/product, cost/costprice/buy, reorder/min/…, 500-row cap) + products/import-dialog.tsx (paste-or-file tabs with drag&drop, live preview table with money formatting, parse warnings list, template download, skip|update radio, result panel with created/updated/skipped/rejected + first errors, disabled after success). Browser-verified: paste 3 rows → preview → import → toast "2 created, 1 skipped" (STA-001 skipped) → products list updated. NOTE: API rows use API field names (costPrice/price/stock/reorderLevel) — raw curl with CSV column names coerces undefined→NaN error (expected zod behavior, dialog maps fields correctly)
+    24→2. CUSTOMER CREDIT LIMITS + AGING: Customer.creditLimit Float? (schema pushed, dev server restarted for fresh client). POST/PUT /api/customers accept nullable creditLimit (zod coerce nullable+optional verified: null stays null, not 0). POST /api/sales enforces inside transaction: newDue + outstanding(COMPLETED, paid<total) > creditLimit → friendly 400 naming limit/due/available. GET /api/customers passes creditLimit through (auto). New GET /api/customers/aging → per-customer outstanding bucketed by invoice age (≤30 / 31–60 / 61–90 / 90+, Dhaka days), totals + oldest-days, sorted desc. UI: customer dialog creditLimit field (empty = no limit); customer cards show LIMIT ৳X LEFT badge (green/red at cap) + limit badge always; Customers header "Aging" button with ৳1.8k dues badge → AgingDialog (sticky-header table, bucket columns color-graded amber→red, EmptyState when clean); checkout-dialog takes customers prop → live "Credit remaining" panel (emerald when fits, red blocked + confirm disabled when over); PosView passes customers through. Curl-verified: over-limit sale 400 with exact message; within-limit 201 due=1780; aging shows Farhana 1780/limit 2000. Browser-verified both dialog states (red blocked ৳290 due vs green ৳90 due) via LED Bulb + Farhana
+    25→3. ONE-CLICK DRAFT POs FROM DASHBOARD: new POST /api/purchase-orders/bulk-draft {productIds} → re-validates low stock server-side, skips no-supplier/recovered products, groups by supplier, suggested qty = max(2×reorder − stock, 10), creates one DRAFT PO per supplier (per-day poNo sequence inside transaction) with note "Auto-drafted from dashboard low-stock alerts". Dashboard LowStockCard: "Draft POs" button → ConfirmDialog (destructive=false, explains grouping + qty rule) → POST → toast with per-PO summary (poNo · supplier · items · est. total) → auto-navigates to Inventory. Browser-verified: 2 low items → 2 supplier drafts created (est. ৳9,605) → landed on Inventory with toast. ListCard gained footerExtra slot for the action button
+    26→
+    27→Work Log — styling polish (mandatory):
+    28→- PageHeader icon chip: gradient (from-primary/20 via-primary/10 to-primary/5) + inset ring + shadow — applies to all 10 views
+    29→- POS product cards: hover lift (-translate-y-0.5 + shadow-md + border-primary/40) with active press settle; price tracking-tight
+    30→- Customer + supplier cards: same hover-lift treatment (transition-all, consistent 150ms)
+    31→- Draft-POs confirm uses primary (non-destructive) styling
+    32→
+    33→Verification:
+    34→- bun run lint: 0 errors (1 pre-existing benign RHF watch warning); bunx tsc --noEmit: 0 errors in src/
+    35→- agent-browser: import dialog flow, aging dialog (light + dark), Draft POs flow, POS credit guard both states, full 10-view sweep → 0 console errors; mobile 390px customers shows DUE + LIMIT badges cleanly
+    36→- dev.log clean (all 200/201, no compile errors)
+    37→
+    38→Stage Summary:
+    39→- Data delta (intentional demo state): Farhana Akter creditLimit=2000 with ৳1,780 due (INV-20260927-0002, demos DUE/LIMIT badges + aging); 2 DRAFT POs PO-20260927-0004/0005 (demos the dashboard flow); products MS-201 Gaming Mouse + KB-330 Mechanical Keyboard imported via the real UI; Ballpoint Pen Pack stock 13/15 and Bluetooth Speaker 6/8 low (QA-DEMO damage movements) — all realistic demo data, kept on purpose
+    40→- New backend surface: /api/products/import, /api/customers/aging, /api/purchase-orders/bulk-draft; Customer.creditLimit column; sales POST credit-limit enforcement
+    41→- No known bugs; lint/tsc/browser clean
+    42→
+    43→Recommended next phase:
+    44→- PDF/Excel report export (P&L, aging, inventory valuation), supplier-level "Suggest POs" inside Inventory low-stock tab reusing bulk-draft, expense recurring templates, multi-user/auth pass, product images, barcode-scanner keyboard wedge tuning in POS
+    45→
+    46→---
+    47→Task ID: 12 (cron round 5)
+    48→Agent: Z (main)
+    49→Task: Status assessment + agent-browser QA + 3 new features (stocktake, expense templates, P&L print) + scanner-wedge POS + real bug fix (doc-number collisions) + styling polish
+    50→
+    51→Work Log — status assessment:
+    52→- Baseline healthy at start: all 10 views render live data (desktop 1280/1600 + mobile 390, light/dark), 0 console errors, lint 0 errors (1 benign RHF warning), tsc clean in src/, all API 200; POS golden path re-verified (add-to-cart → totals → Charge enabled)
+    53→- Dev server restarted mid-round after schema push (fresh Prisma client) via (setsid bun run dev &) double-fork
+    54→
+    55→Work Log — bugs found & fixed:
+    56→1. REAL BUG (pre-existing, caught by browser E2E): document numbers used count-based sequencing (`count(prefix) + 1`), so once a PO was deleted during the day the next bulk-draft/PO create hit `Unique constraint failed on poNo` (500). Fixed with gap-safe max+1 sequencing: new `maxSeqOf`/`nextDocNumber` helpers in src/lib/api-utils.ts; applied to POST /api/purchase-orders (nextPoNo), POST /api/purchase-orders/bulk-draft (inside tx), and POST /api/sales invoiceNo (defensive — invoices aren't deleted but same pattern). Verified: after deleting smoke POs 0004/0005, new POs correctly number 0006/0007
+    57→2. Minor mobile styling: DUE/LIMIT badges on customer cards could crowd the kebab menu at 390px → badges now wrap in a flex-wrap row with pr-7, verified no overlap
+    58→
+    59→Work Log — new features shipped:
+    60→1. STOCKTAKE (physical inventory count): new POST /api/stock/stocktake (zod-validated up to 500 rows, transactional per-product ADJUST movements with reference STOCKTAKE, skips unchanged rows, returns per-item before/after/delta + varianceValue at cost). New inventory/stocktake-dialog.tsx: search, per-row counted input (placeholder = system stock), live variance badges (+green/−red), "Changed only" filter, running "N rows will be corrected (±৳X at cost)" summary with reset, note field, result panel after apply. Entry: Inventory header "Stocktake" button. Browser-verified full flow: counted STA-001 36→37 (+1, +৳400 variance) → toast + result panel → ledger shows ADJUST ref STOCKTAKE → reverted 37→36 the same way
+    61→2. RECURRING EXPENSE TEMPLATES: new Prisma model ExpenseTemplate (title/category/amount/method/frequency DAILY|WEEKLY|MONTHLY/lastPostedAt/active), schema pushed + server restarted. New API: GET/POST /api/expense-templates, PUT/DELETE /api/expense-templates/[id], POST /api/expense-templates/[id]/post (transactional: creates today's Expense with reference TPL:<title> + stamps lastPostedAt). New expenses/templates-dialog.tsx: list with category dot, frequency badge, method, last-posted, amount; inline create/edit form; per-row Post-today / Edit / Delete (ConfirmDialog). Entry: Expenses header "Templates" button. Browser-verified: post → toast "Expense posted — Shop rent ৳12,000" → "last posted 27 Sep 2026"; posted expense then deleted + lastPostedAt reset to keep demo numbers clean (template kept as demo data)
+    62→3. P&L PRINT / PDF: new reports/pnl-print.tsx — Print button in the P&L breakdown card header; hidden .report-print-area clone (store header, range, waterfall table, summary, expenses by category, net margin) rendered at component root; on Print body tagged `printing-report`, globals.css A4 print block isolates the clone (ink-friendly, table borders, tabular-nums right-aligned). Same proven pattern as Z-report. Browser-verified class tagging + cleanup (window.print stubbed)
+    63→4. POS SCANNER WEDGE TUNING: Enter handler now (a) supports quantity prefix `3*SKU` / `3xBARCODE` (adds N units in one scan, clamped to stock), (b) prefers exact barcode then exact SKU match (case-insensitive) over substring matches, (c) shows "No product matches X" toast instead of silent no-op; query preserved after failed match for easy correction; pos store addItem(product, qty?) extended; search input gained title hint. Browser-verified: 3*STA-001 → 3 × A4 Paper (৳1,680 total), sta-002 exact match adds pen, ZZZ-NOPE → error toast
+    64→
+    65→Work Log — styling polish (mandatory):
+    66→- KPI COUNT-UP: new hooks/use-count-up.ts (rAF ease-out tween, prefers-reduced-motion respected, cascading-render-safe); StatCard gained animatedValue {value, format} + valueClassName props; all 6 dashboard KPIs now glide on load/refresh (Sales/Transactions/Gross/Expenses/Net/Stock Value), Net Profit keeps emerald/red tone via valueClassName
+    67→- Products table: new Margin column (xl+ breakpoints) with colored margin badges (≥25% emerald, 10–25% amber, <10% red, tooltip shows cost→price) — margin quality visible at a glance; min-w bumped to 960px
+    68→- Templates dialog footnote reflow (icon top-aligned, nowrap code chip) after spotting cramped wrap in screenshot
+    69→- ConfirmDialog: optional leading icon in a soft primary chip (used by Draft-POs confirm)
+    70→- Inventory low-stock tab: amber-tinted attention banner with count + "Draft POs for all" action
+    71→
+    72→Verification:
+    73→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+    74→- agent-browser: full 10-view sweep 0 console errors (1280 + 1600 + 390px); stocktake/PO-draft/templates/post flows all green; print trigger verified with stubbed window.print
+    75→- API curl suite: expense-templates CRUD + post, stocktake (adjust + revert), bulk-draft gap-safe numbering — all verified; recent dev.log entries all 200
+    76→- Demo data delta: 2 DRAFT POs PO-20260927-0006/0007 (from low-stock flow), 1 template "Shop rent — Uttara branch" (৳12,000/mo, never posted), 3 STOCKTAKE ADJUST movements in ledger (net zero), STA-002/ELC-003 still low for badge demos
+    77→
+    78→Stage Summary:
+    79→- Backend surface added: /api/stock/stocktake, /api/expense-templates (+[id], +[id]/post); ExpenseTemplate model; gap-safe doc numbering helper (maxSeqOf/nextDocNumber) fixes unique-violation class of bugs
+    80→- Frontend: Stocktake dialog, Templates dialog, P&L print, scanner-wedge POS entry, KPI count-up, Products margin column, DUE badge mobile fix
+    81→- Known limitations: stocktake UI page size capped at 200 search results (API takes 500); templates are manual-post only (no scheduler by design — posting is an explicit cashier action); P&L print layout is A4 (receipt printer stays for invoices)
+    82→
+    83→Recommended next phase:
+    84→- Inventory valuation print + aging report print (same report-print-area pattern), supplier statement view (PO history per supplier), stocktake session persistence (save in-progress counts), expense attachments, product images, multi-user/auth pass, cashier shift (X-report) tracking
+    85→
+    86→---
+    87→Task ID: 13 (cron round 6)
+    88→Agent: Z (main)
+    89→Task: Status assessment + agent-browser QA + new features (supplier statement, valuation print, aging print, stocktake draft persistence) + styling polish
+    90→
+    91→Work Log — status assessment:
+    92→- Baseline healthy: all 10 views render with 0 console errors (desktop + mobile 390px), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/ (errors only in non-app examples/skills folders), dev.log all 200s
+    93→- POS golden path re-verified live: add-to-cart → Charge enabled with correct total (A4 Paper ৳910)
+    94→- Decision: no bugs found → proceeded with new-feature development per plan backlog
+    95→
+    96→Work Log — new features shipped:
+    97→1. SUPPLIER STATEMENT: new GET /api/suppliers/[id]/statement (read-only additive) — supplied-product portfolio (count/units/stock value at cost & retail/low-stock/top-12 by value), PO stats (total/draft/ordered/received/cancelled counts + draftValue/openValue/receivedValue + last order & last received dates), last 200 POs with item/qty/cost rollups. New SupplierStatement type family in src/lib/types.ts. New suppliers/statement-dialog.tsx: 4 accent-striped stat tiles, status badge row (received value/awaiting/drafts/low stock/margin %), PO history table (sticky header, status badges), top-products chips, "Print statement" button → A4 report-print-area clone (portfolio table + PO table with received/open/total-value footer). Entry: new FileText icon button on every supplier card (between edit & delete). Browser-verified with Dhaka Wholesale Mart (2 draft POs ৳2,210 open value) + API curl for Anwar Trade International (0 POs path)
+    98→2. STOCK VALUATION PRINT: new inventory/valuation-print.tsx — "Valuation" button in Inventory header (hidden when no products). A4 clone: totals (units, value at cost/retail, potential margin %, low/out counts) + full per-product table sorted by value at cost desc (SKU/name/category/stock+unit/cost/price/value) with totals row. Same printing-report body-tag pattern. Browser-verified clone content activates with correct store header
+    99→3. AGING REPORT PRINT: aging-dialog.tsx extended — "Print aging report" button (left-aligned in footer, only when rows exist) + A4 clone with per-customer bucket rows (phone inline), bucket totals row + grand total due. Return converted to fragment to host clone outside Dialog. Browser-verified clone content
+   100→4. STOCKTAKE DRAFT PERSISTENCE: stocktake-dialog.tsx now auto-saves in-progress counts to localStorage (circuit.stocktake.draft.v1, debounced 600ms, rows+note+savedAt, try/catch best-effort). On open: draft restored + toast "Resumed stocktake draft — N counts saved <time>"; dashed indicator bar shows "Draft auto-saved at <time> · N counts kept if you close or reload" with Discard draft button; Reset counts and successful apply both clear the draft; stale product ids in draft are harmless (never match). Browser-verified: count 34 → close → reopen → value restored + indicator shown → Discard cleared
+   101→
+   102→Work Log — styling polish (mandatory):
+   103→- Supplier statement stat tiles: 2.5px top accent stripes (primary/sky/emerald/amber per metric)
+   104→- Aging dialog: bucket column headers now color-coded (amber 31–60, orange 61–90, red 90+) matching body cells; Total-due badge gains shadow
+   105→- Supplier cards: hover:border-primary/30 ring added to existing hover-lift
+   106→- Statement dialog: removed nonexistent styled-scrollbar class (global thin-scrollbar CSS already applies)
+   107→
+   108→Verification:
+   109→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   110→- agent-browser: 10-view sweep (dashboard/pos/sales/products/inventory/expenses/customers/suppliers/reports/settings) 0 console errors; mobile 390px suppliers shows statement/edit/delete icons cleanly; POS golden path green; print clones verified for valuation + aging + statement; stocktake draft save/resume/discard verified
+   111→- dev.log: all 200s, no compile errors
+   112→- No data mutations this round (all features read-only except stocktake draft which was discarded)
+   113→
+   114→Stage Summary:
+   115→- Backend surface added: GET /api/suppliers/[id]/statement; types: SupplierStatement/SupplierStatementOrder
+   116→- Frontend: statement-dialog.tsx, valuation-print.tsx; aging-dialog + stocktake-dialog extended; SuppliersView statement button
+   117→- All four P&L/valuation/aging/statement reports now print to ink-friendly A4/PDF via one shared CSS pattern
+   118→- Known limitations: statement lists last 200 POs (fine for demo scale); valuation print is A4 (not receipt printer); stocktake draft is per-browser (localStorage), not multi-device
+   119→
+   120→Recommended next phase:
+   121→- X-report (cashier shift close) from Sales view; PO receive with per-line partial quantities; supplier statement email/export; product images; multi-user/auth pass; dashboard auto-refresh indicator polish
+   122→
+   123→---
+   124→Task ID: 14 (cron round 7)
+   125→Agent: Z (main)
+   126→Task: Status assessment + agent-browser QA + new features (X-Report shift snapshot, PO per-line partial receive, dashboard live countdown w/ pause, POS product thumbnails + stock bars) + styling polish
+   127→
+   128→Work Log — status assessment:
+   129→- Baseline healthy at start: all 10 views render with 0 console errors (desktop 1280 + mobile 390), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s
+   130→- POS golden path re-verified live (add-to-cart → ৳560 total). Decision: no bugs found → new-feature development from plan backlog
+   131→
+   132→Work Log — new features shipped:
+   133→1. X-REPORT (SHIFT SNAPSHOT): backend GET /api/reports?type=xreport&from=YYYY-MM-DD&fromTime=HH:MM — zReport engine refactored to accept fromTimeMin (window start = day start + minutes); response gains kind:'X'|'Z', fromTime, label "27 Sep · from 09:00"; validation rejects bad HH:MM (400). Frontend sales/x-report.tsx: sky-accented dialog with shift presets (Morning 09:00 / Evening 17:00 / Last 8 hours), date + time inputs, reuses exported ZReportBody (kind-aware titles: "Sales this shift", print header "X-Report · Shift Snapshot"), same printing-zreport print CSS + clone. Entry: sky "X-Report" button in Sales header (left of Z-Report). Browser-verified: 09:00 → ৳0 (sales were 00:20–01:20 AM), custom 00:15 → ৳6,380 (correctly excludes the earlier ৳560 sale); print trigger verified with stubbed window.print; Z-report unchanged (kind Z)
+   134→2. PO PER-LINE PARTIAL RECEIVE: Prisma PurchaseOrderItem.receivedQty Float @default(0) pushed; receive route rewritten — body {lines:[{productId, qty, unitCost?}]} where qty = THIS delivery, up-front validation (no over-receive, no negative, nothing-to-receive guard), per-line receivedQty increment + PURCHASE movements + cost update, status recomputed: all→RECEIVED / some→PARTIAL / none→unchanged; PUT route now blocks item edits on PARTIAL POs. New inventory/receive-dialog.tsx: per-line Ordered/Received/Now columns, clamped receiving inputs, unit-cost override, per-line delivery progress bars (amber in-progress → emerald done), Fill remaining / Clear buttons, live "This delivery (at cost)" total, Receive all vs Receive delivery button label. PO table: new Received column (% + n/n + progress bar), cyan PARTIAL badge, "Receive rest" button label, min-w 960. Browser-verified full cycle on PO-20260927-0006: receive 4/10 → toast + 40% amber bar + PARTIAL → receive rest 6 → RECEIVED 10/10; ledger shows both movements (4: 6→10, 6: 10→16)
+   135→   - REAL BUG (caught by own E2E, fixed): reopening the receive dialog kept stale qtyNow because prop-driven open doesn't fire Dialog onOpenChange → initFrom moved to a useEffect on [open, po]; verified NOW defaults to remaining (6) on reopen
+   136→3. DASHBOARD LIVE COUNTDOWN + PAUSE: DashboardView now drives refresh via its own 60s countdown (exact sync — fires refetch at 0, resets on completion) instead of useApi pollMs; header shows LIVE pill with SVG countdown ring (stroke-dashoffset animated, emerald), pause/resume toggle (amber dot + "LIVE PAUSED" when paused), manual refresh keeps ring reset. Browser-verified countdown ticking (59s), pause → LIVE PAUSED → resume → LIVE
+   137→4. POS PRODUCT THUMBNAILS + STOCK BARS: new ProductThumb (deterministic hashColor gradient tile, 135° fade, product initials, ring) on every POS product card + new StockBar (stock vs 3× reorder level: emerald healthy / amber low / red out at 100% width) at card bottom; card layout reworked (thumb left, name+sku right, price+badge, bar). Cart line items get matching mini CartThumb keyed off SKU for cohesion. Browser-verified desktop + mobile 390 (2-col grid, thumbnails + amber low bar visible), cart shows AP/CB thumbs matching grid
+   138→
+   139→Work Log — styling polish (mandatory):
+   140→- X-Report button sky-tinted outline (border-sky-500/40 + hover fill) distinguishing it from Z-Report
+   141→- Receive dialog: emerald chip icon in title, sticky table header with backdrop-blur, muted/60 summary strip, clamped inputs with aria labels
+   142→- PO table Received column color-logic (emerald ≥100%, amber >0, muted 0) + title tooltips
+   143→- POS cards: min-h tightened to 5.75rem, gap rhythm 1.5, thumbnails ring-1 ring-black/5 for dark-mode depth
+   144→- Dashboard ring: -rotate-90 SVG with ease-linear transition — reads as a clock draining toward refresh
+   145→
+   146→Verification:
+   147→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   148→- agent-browser: 10-view sweep 0 console errors (desktop + mobile); X-report data/print verified; partial receive full cycle verified incl. reopen-defaults bug fix; dashboard pause/resume verified; POS add-to-cart with new cards verified (৳650 2-item cart) then cart cleared
+   149→- API curl suite: xreport happy path + 400 validation + kind/label/fromTime fields; purchase-orders list shows receivedQty persisted
+   150→- dev.log: all 200s/400-as-designed, no compile errors
+   151→- Demo data delta: PO-20260927-0006 now RECEIVED (receivedQty 10/10), Bluetooth Speaker X15 stock 6→16 (no longer low; STA-002 pen remains low for badge demos), 2 new PURCHASE movements in ledger — realistic completed-PO demo state
+   152→
+   153→Stage Summary:
+   154→- Backend surface added: xreport type in /api/reports (fromTime param, kind/fromTime fields); receive route rewritten for per-line partial deliveries with receivedQty tracking; PurchaseOrderItem.receivedQty column; PUT route PARTIAL edit guard
+   155→- Frontend: x-report.tsx, receive-dialog.tsx; z-report.tsx exports ZReportBody (kind-aware); SalesView X-Report button; purchase-orders.tsx Received column + dialog wiring; DashboardView countdown/pause; PosView + cart-panel thumbnails/bars
+   156→- Known limitations: X-report covers a single Dhaka day only (overnight shifts spanning midnight need two X-reports); "Last 8 hours" preset clamps to today's window (post-midnight use shows only today's slice); partial receive UI assumes one open delivery per line at a time
+   157→- Schema note: receivedQty defaults 0 — existing RECEIVED POs (0001, PO-20260926-0001) show 0% received bars; cosmetic only (status RECEIVED renders emerald regardless)
+   158→
+   159→Recommended next phase:
+   160→- Receipt/receive-note printing for partial deliveries (GRN print), supplier statement to include receivedQty line progress, stocktake session persistence server-side, product images upload, multi-user/auth pass, cashier shift (X-report auto-open on POS login) tracking
+   161→
+   162→---
+   163→Task ID: 15 (cron round 8)
+   164→Agent: Z (main)
+   165→Task: Status assessment + agent-browser QA + new features (GRN print, product image URLs with shared avatar component, supplier statement delivery progress) + demo product photos
+   166→
+   167→Work Log — status assessment:
+   168→- Baseline healthy: 10-view sweep 0 console errors (desktop 1280 + mobile 390 spot checks), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s; POS golden path verified (add → ৳560)
+   169→- Decision: no bugs → feature development from worklog backlog (GRN print, supplier statement progress, product images)
+   170→
+   171→Work Log — new features shipped:
+   172→1. GRN (GOODS RECEIVED NOTE) PRINT: new inventory/grn-print.tsx — per-PO A4 receiving document via the shared .report-print-area pattern (body.printing-report). Content: store header, "Goods Received Note (GRN)", PO no + status, supplier + PO date + delivery state (None yet / Partial / Complete + last received date), per-line table (Product/SKU/Ordered/Received/Remaining with amber-when-open or green-when-done tone/Unit cost/Received value), totals row, order vs received value footer, "Received by / Checked by" signature lines, Dhaka timestamp. Entry: printer icon button on PO rows with status ORDERED/PARTIAL/RECEIVED (DRAFT/CANCELLED excluded). Browser-verified: clone for PO-20260927-0006 contains PO no, Totals, signature lines, delivery state; window.print trigger verified (stubbed)
+   173→2. PRODUCT IMAGE URLS + SHARED AVATAR: Prisma Product.imageUrl String? pushed (nullable, additive). New API validation: zod imageUrl in POST/PUT products (http(s) URL or data:image URI, 300KB cap, ''→null) + isValidImageUrl helper in api-utils; PUT flows through via ...data spread. New shared component components/shared/product-avatar.tsx: renders photo when present, onError falls back to deterministic gradient initials tile (same hashColor), size/text via props. Wired into: POS product cards (replaces local ProductThumb), POS cart line items (CartItem gained imageUrl, pos store addItem copies it), products table name cell (new 32px mini avatar beside name), product dialog (new "Product image URL" field with 56px live preview that switches initials→photo as you type). API verified: PUT with 1-3KB data URIs persists and GETs back (3 products carrying images)
+   174→3. SUPPLIER STATEMENT DELIVERY PROGRESS: statement API now returns receivedQty per PO (items include receivedQty) + poStats.partial count. Type SupplierStatementOrder.receivedQty + poStats.partial added. Dialog: "Qty" column → "Delivery" column with DeliveryProgress component (received/ordered units + color-logic mini progress bar, cyan partial badge in status row); print clone column now "Delivered" as "n/m units". Browser-verified with Fresh Foods Supply Co: PO-0006 100% emerald 10/10, PO-0004 DRAFT 0% 0/10
+   175→4. DEMO PRODUCT PHOTOS: generated 3 studio-style product photos via z-ai CLI (A4 paper ream / chocolate bar / white cube speaker, 1024px) → saved to download/product-img/, downscaled with ffmpeg to 128px JPEGs (0.9-2.3KB), attached as data URIs to STA-001, SNK-005, ELC-003 via PUT /api/products/:id. POS grid + products table now show real photos mixed with initials tiles — demonstrates both states
+   176→
+   177→Work Log — bug fixed (self-inflicted, caught immediately):
+   178→- A failed MultiEdit batch on purchase-orders.tsx partially applied, stripping size/className/aria-label off the PO Delete button (accessibility regression). Restored the full button attributes; verified 10-view sweep + a11y labels intact
+   179→
+   180→Work Log — styling polish (mandatory):
+   181→- GRN document: slate print palette, amber/green remaining-qty tones, signature rules — reads like a real warehouse form
+   182→- Products table: avatar + name cluster with 8px gap keeps row rhythm; barcode stays secondary line
+   183→- Statement: cyan partial badge joins the emerald/amber status row family
+   184→- Product dialog: image preview tile gets border+bg so data-URI photos with white backgrounds sit correctly in dark mode
+   185→
+   186→Verification:
+   187→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   188→- agent-browser: full 10-view sweep 0 console errors + mobile spot checks (pos/products/suppliers) 0; GRN clone content verified; statement progress verified; product dialog preview verified; POS golden path with photo tiles verified
+   189→- API curl: imageUrl PUT persisted for 3 SKUs; products GET returns imageUrl
+   190→- dev.log: all 200s, no compile errors
+   191→- Demo data delta: 3 products with embedded 128px JPEG data-URI photos (STA-001, SNK-005, ELC-003); download/product-img/ holds source PNGs + JPGs
+   192→
+   193→Stage Summary:
+   194→- Backend: Product.imageUrl column + validation in both product routes; statement API returns receivedQty + partial stats; isValidImageUrl helper
+   195→- Frontend: grn-print.tsx, product-avatar.tsx (shared), product dialog image field + preview, POS/cart/products-table avatar wiring, statement DeliveryProgress
+   196→- Known limitations: images are URL/data-URI only (no file-upload storage in sandbox); ProductAvatar <img> uses plain src (remote hosts need CORS-free access; data URIs always safe); GRN assumes cumulative state (not per-delivery history — ledger holds that)
+   197→- Schema note: Product.imageUrl nullable, default null — zero migration risk for existing rows
+   198→
+   199→Recommended next phase:
+   200→- Server-side image upload endpoint (multipart → db/local storage) to replace URL pasting, product image in sale receipt + product performance report, GRN per-delivery history (ledger-based), stocktake session persistence, multi-user/auth pass, barcode scanner wedge tuning follow-up
