@@ -56,6 +56,7 @@ const putSchema = z.object({
   email: z.string().trim().max(160).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
+  creditLimit: z.coerce.number().min(0, 'Credit limit must be >= 0').max(99_999_999).nullable().optional(),
 })
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
@@ -65,7 +66,10 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     const existing = await db.customer.findUnique({ where: { id } })
     if (!existing) return bad('Customer not found', 404)
 
-    const updated = await db.customer.update({ where: { id }, data })
+    const updated = await db.customer.update({
+      where: { id },
+      data: { ...data, creditLimit: data.creditLimit === undefined ? undefined : data.creditLimit },
+    })
     return NextResponse.json(updated)
   } catch (e) {
     if (e instanceof z.ZodError) return bad(zodMsg(e))

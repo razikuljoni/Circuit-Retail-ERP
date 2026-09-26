@@ -301,17 +301,17 @@ export default function PosView() {
                         onClick={() => addItem(p)}
                         aria-label={`Add ${p.name} to sale`}
                         className={cn(
-                          'flex min-h-24 flex-col gap-1 rounded-xl border bg-card p-2.5 text-left shadow-xs transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                          'group flex min-h-24 flex-col gap-1 rounded-xl border bg-card p-2.5 text-left shadow-xs',
+                          'transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                           out
                             ? 'cursor-not-allowed opacity-50'
-                            : 'hover:border-primary/40 hover:bg-accent/40'
+                            : 'hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/40 hover:shadow-md active:translate-y-0 active:shadow-xs'
                         )}
                       >
                         <span className="line-clamp-2 min-h-8 text-xs font-medium leading-4">{p.name}</span>
                         <span className="truncate font-mono text-[10px] text-muted-foreground">{p.sku}</span>
                         <div className="mt-auto flex items-center justify-between gap-1 pt-1">
-                          <span className="text-sm font-bold">{fmtMoney(p.price)}</span>
+                          <span className="text-sm font-bold tracking-tight">{fmtMoney(p.price)}</span>
                           <StockBadge product={p} />
                         </div>
                       </motion.button>
@@ -445,7 +445,7 @@ export default function PosView() {
       </Sheet>
 
       {/* ── Dialogs ─────────────────────────────────────────────────────────── */}
-      <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} onCompleted={handleCheckoutComplete} />
+      <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} onCompleted={handleCheckoutComplete} customers={customers ?? []} />
       <ReceiptDialog sale={receiptSale} onDone={() => setReceiptSale(null)} />
       <ConfirmDialog
         open={clearOpen}

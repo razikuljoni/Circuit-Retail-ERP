@@ -20,7 +20,7 @@ import { Spinner } from '@/components/shared/page-bits'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { fmtMoney } from '@/lib/format'
-import type { Sale } from '@/lib/types'
+import type { Customer, Sale } from '@/lib/types'
 import { useMutation } from '@/hooks/use-api'
 import { cartTotals, usePosStore } from '@/store/pos'
 
@@ -32,15 +32,17 @@ export function CheckoutDialog({
   open,
   onOpenChange,
   onCompleted,
+  customers,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCompleted: (sale: Sale) => void
+  customers: Customer[]
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md gap-4" aria-describedby={undefined}>
-        {open && <CheckoutForm onOpenChange={onOpenChange} onCompleted={onCompleted} />}
+        {open && <CheckoutForm onOpenChange={onOpenChange} onCompleted={onCompleted} customers={customers} />}
       </DialogContent>
     </Dialog>
   )
@@ -49,9 +51,11 @@ export function CheckoutDialog({
 function CheckoutForm({
   onOpenChange,
   onCompleted,
+  customers,
 }: {
   onOpenChange: (open: boolean) => void
   onCompleted: (sale: Sale) => void
+  customers: Customer[]
 }) {
   const cart = usePosStore((s) => s.cart)
   const customerId = usePosStore((s) => s.customerId)
@@ -72,6 +76,17 @@ function CheckoutForm({
   // Credit sales: partial payment is allowed when the sale is attached to a customer
   const creditAllowed = customerId !== null && customerId !== undefined && customerId !== ''
   const creditBlocked = due > 0 && !creditAllowed
+
+  // Credit-limit awareness: show remaining head-room, block when the due exceeds it
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => c.id === customerId) ?? null,
+    [customers, customerId]
+  )
+  const hasLimit = selectedCustomer?.creditLimit != null
+  const limitRemaining = hasLimit
+    ? round2((selectedCustomer!.creditLimit as number) - (selectedCustomer!.totalDue ?? 0))
+    : null
+  const overLimit = hasLimit && due > 0 && limitRemaining !== null && due > limitRemaining + 0.001
 
   /** Exact + next round numbers (100/200/500/1000/2000 ceilings). */
   const quickCash = useMemo(() => {
@@ -119,7 +134,8 @@ function CheckoutForm({
     }
   }
 
-  const canConfirm = cart.length > 0 && !createSale.pending && (due <= 0 || creditAllowed)
+  const canConfirm =
+    cart.length > 0 && !createSale.pending && (due <= 0 || (creditAllowed && !overLimit))
 
   return (
     <div className="flex flex-col gap-4">
@@ -171,6 +187,35 @@ function CheckoutForm({
         <p className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           <UserRound className="size-3.5 shrink-0" aria-hidden />
           Select a customer in the cart panel to record the {fmtMoney(due)} balance as credit (due).
+        </p>
+      )}
+
+      {/* Credit-limit panel for the selected customer */}
+      {creditAllowed && hasLimit && (
+        <p
+          className={cn(
+            'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs',
+            overLimit
+              ? 'border-red-500/50 bg-red-500/5 text-red-700 dark:text-red-400'
+              : limitRemaining !== null && limitRemaining < due
+                ? 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400'
+                : 'border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
+          )}
+          aria-live="polite"
+        >
+          <UserRound className="size-3.5 shrink-0" aria-hidden />
+          {overLimit ? (
+            <span>
+              <strong>{selectedCustomer?.name}</strong> has only <strong>{fmtMoney(limitRemaining ?? 0)}</strong> of
+              credit left — this sale leaves {fmtMoney(due)} due. Collect the balance or raise the limit.
+            </span>
+          ) : (
+            <span>
+              Credit remaining for <strong>{selectedCustomer?.name}</strong>:{' '}
+              <strong>{fmtMoney(limitRemaining ?? 0)}</strong>
+              {limitRemaining !== null && limitRemaining - due < 0 && ' — this sale exceeds it'}
+            </span>
+          )}
         </p>
       )}
 

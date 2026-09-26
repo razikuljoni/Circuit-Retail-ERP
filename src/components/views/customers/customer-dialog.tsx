@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save } from 'lucide-react'
+import { CreditCard, Loader2, Save } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Customer } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ export function CustomerDialog({
   const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [creditLimit, setCreditLimit] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -38,12 +39,14 @@ export function CustomerDialog({
       setEmail(customer.email ?? '')
       setAddress(customer.address ?? '')
       setNotes(customer.notes ?? '')
+      setCreditLimit(customer.creditLimit != null ? String(customer.creditLimit) : '')
     } else {
       setName('')
       setPhone('')
       setEmail('')
       setAddress('')
       setNotes('')
+      setCreditLimit('')
     }
   }, [open, customer])
 
@@ -61,6 +64,17 @@ export function CustomerDialog({
         email: email.trim() || null,
         address: address.trim() || null,
         notes: notes.trim() || null,
+        creditLimit:
+          creditLimit.trim() === ''
+            ? null
+            : Number.isFinite(Number(creditLimit)) && Number(creditLimit) >= 0
+              ? Number(creditLimit)
+              : null,
+      }
+      if (creditLimit.trim() !== '' && (!Number.isFinite(Number(creditLimit)) || Number(creditLimit) < 0)) {
+        toast.error('Credit limit must be a non-negative number (or empty for no limit)')
+        setSaving(false)
+        return
       }
       if (isEdit) {
         await api.put(`/api/customers/${customer.id}`, payload)
@@ -108,6 +122,22 @@ export function CustomerDialog({
           <div className="space-y-1.5">
             <Label htmlFor="c-notes">Notes</Label>
             <Textarea id="c-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Preferences, credit terms…" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="c-limit" className="flex items-center gap-1.5">
+              <CreditCard className="size-3.5 text-muted-foreground" />
+              Credit limit (৳)
+            </Label>
+            <Input
+              id="c-limit"
+              type="number"
+              min={0}
+              step="any"
+              value={creditLimit}
+              onChange={(e) => setCreditLimit(e.target.value)}
+              placeholder="No limit — leave empty"
+            />
+            <p className="text-xs text-muted-foreground">Partial-payment sales are blocked once outstanding dues reach this ceiling.</p>
           </div>
         </div>
 

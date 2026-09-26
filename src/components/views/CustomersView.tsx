@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
+  AlarmClock,
   HandCoins,
   History,
   Mail,
@@ -34,6 +35,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { useDebouncedValue } from './customers/use-debounced-value'
 import { CustomerDialog } from './customers/customer-dialog'
 import { HistoryDialog } from './customers/history-dialog'
+import { AgingDialog } from './customers/aging-dialog'
 
 /** Deterministic soft avatar tint per name (dark-mode safe, no blue/indigo). */
 const AVATAR_TONES = [
@@ -74,6 +76,9 @@ export default function CustomersView() {
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
   const [deletePending, setDeletePending] = useState(false)
   const [settlingId, setSettlingId] = useState<string | null>(null)
+  const [agingOpen, setAgingOpen] = useState(false)
+
+  const totalOutstanding = customers.reduce((sum, c) => sum + (c.totalDue ?? 0), 0)
 
   async function settleAll(c: Customer) {
     setSettlingId(c.id)
@@ -125,10 +130,24 @@ export default function CustomersView() {
         title="Customers"
         subtitle="Profiles and purchase history"
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="size-4" />
-            Add customer
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setAgingOpen(true)}>
+              <AlarmClock className="size-4" />
+              <span className="hidden sm:inline">Aging</span>
+              {totalOutstanding > 0 && (
+                <Badge
+                  variant="outline"
+                  className="ml-1 border-amber-500/40 bg-amber-500/10 px-1.5 text-[10px] font-bold text-amber-700 dark:text-amber-400"
+                >
+                  {fmtMoney(totalOutstanding, { compact: true })}
+                </Badge>
+              )}
+            </Button>
+            <Button onClick={openCreate}>
+              <Plus className="size-4" />
+              Add customer
+            </Button>
+          </>
         }
       />
 
@@ -165,7 +184,7 @@ export default function CustomersView() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {customers.map((c) => (
-            <Card key={c.id} className="p-4 sm:p-5 flex flex-col gap-3">
+            <Card key={c.id} className="p-4 sm:p-5 flex flex-col gap-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-start gap-3">
                 <Avatar className="size-10">
                   <AvatarFallback className={`text-sm font-semibold ${avatarTone(c.name)}`}>
@@ -188,6 +207,18 @@ export default function CustomersView() {
                   {(c.totalDue ?? 0) > 0 && (
                     <Badge className="mt-1.5 border border-amber-500/40 bg-amber-500/10 text-[10px] font-bold text-amber-700 dark:text-amber-400" variant="outline">
                       DUE {fmtMoney(c.totalDue ?? 0)}
+                    </Badge>
+                  )}
+                  {c.creditLimit != null && (c.totalDue ?? 0) > 0 && (
+                    <Badge
+                      className={`mt-1 ml-1 border text-[10px] font-bold ${
+                        (c.totalDue ?? 0) >= c.creditLimit
+                          ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400'
+                          : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                      }`}
+                      variant="outline"
+                    >
+                      LIMIT {fmtMoney(Math.max(0, c.creditLimit - (c.totalDue ?? 0)), { compact: true })} LEFT
                     </Badge>
                   )}
                 </div>
@@ -224,6 +255,11 @@ export default function CustomersView() {
               <div className="flex items-end justify-between gap-2 mt-auto">
                 <div>
                   <Badge variant="secondary">{c._count?.sales ?? 0} purchases</Badge>
+                  {c.creditLimit != null && (
+                    <Badge variant="outline" className="ml-1 text-[10px] text-muted-foreground">
+                      limit {fmtMoney(c.creditLimit, { compact: true })}
+                    </Badge>
+                  )}
                   {c.lastPurchaseAt && (
                     <p className="text-[11px] text-muted-foreground mt-1.5">Last: {fmtDate(c.lastPurchaseAt)}</p>
                   )}
@@ -250,6 +286,8 @@ export default function CustomersView() {
         customerName={customers.find((c) => c.id === historyId)?.name ?? 'Customer'}
         onClose={() => setHistoryId(null)}
       />
+
+      <AgingDialog open={agingOpen} onClose={() => setAgingOpen(false)} />
 
       <ConfirmDialog
         open={deleteTarget !== null}

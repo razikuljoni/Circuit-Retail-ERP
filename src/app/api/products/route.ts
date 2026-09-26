@@ -39,8 +39,9 @@ export async function GET(req: NextRequest) {
     }
     if (categoryId) where.categoryId = categoryId
     if (supplierId) where.supplierId = supplierId
-    if (lowStock) where.stock = { lte: 0 } // refined below — Prisma can't compare two columns
-    if (outOfStock) where.stock = { lte: 0 }
+    // NOTE: lowStock needs stock <= reorderLevel (column comparison) → refined in JS below.
+    // outOfStock can be expressed in SQL directly.
+    if (outOfStock && !lowStock) where.stock = { lte: 0 }
 
     let orderBy: Prisma.ProductOrderByWithRelationInput = { name: 'asc' }
     if (sort === 'stock') orderBy = { stock: 'asc' }
@@ -49,7 +50,8 @@ export async function GET(req: NextRequest) {
     let products = await db.product.findMany({
       where,
       orderBy,
-      ...(limit ? { take: limit } : {}),
+      // lowStock needs a full scan before the JS refinement — never truncate early
+      ...(limit && !lowStock ? { take: limit } : {}),
       include: {
         category: true,
         supplier: true,
@@ -57,7 +59,10 @@ export async function GET(req: NextRequest) {
     })
 
     // lowStock filter needs stock <= reorderLevel (column comparison) → filter in JS
-    if (lowStock) products = products.filter((p) => p.stock <= p.reorderLevel)
+    if (lowStock) {
+      products = products.filter((p) => p.stock <= p.reorderLevel)
+      if (limit) products = products.slice(0, limit)
+    }
 
     // Sales velocity (last 7 days) → avg daily qty sold + days of stock cover
     const since7d = new Date(Date.now() - 7 * 86400000)

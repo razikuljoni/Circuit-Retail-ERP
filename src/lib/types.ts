@@ -72,6 +72,8 @@ export interface Customer {
   lastPurchaseAt?: string | null
   /** Outstanding credit = Σ(total − paid) across COMPLETED sales (additive) */
   totalDue?: number
+  /** Optional credit ceiling; null/undefined = no limit (additive) */
+  creditLimit?: number | null
 }
 
 export interface SaleItem {
@@ -281,4 +283,23 @@ export interface ZReport {
   expectedCash: number
   hourly: { hour: string; label: string; sales: number; transactions: number }[]
   topItems: { name: string; sku: string; qty: number; revenue: number }[]
+}
+
+/** Receivables aging report (GET /api/customers/aging, additive) */
+export interface AgingRow {
+  customerId: string
+  name: string
+  phone: string | null
+  creditLimit: number | null
+  totalDue: number
+  invoices: number
+  oldestDays: number
+  buckets: { c30: number; c60: number; c90: number; c90plus: number }
+}
+
+export interface AgingReport {
+  generatedAt: string
+  totalDue: number
+  customersWithDues: number
+  rows: AgingRow[]
 }

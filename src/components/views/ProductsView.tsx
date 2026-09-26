@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Tags,
+  Upload,
 } from 'lucide-react'
 import { api, qs } from '@/lib/api'
 import { fmtMoney, fmtNum, fmtQty } from '@/lib/format'
@@ -31,6 +32,7 @@ import { downloadProductsCsv } from './products/csv'
 import { useDebouncedValue } from './products/use-debounced-value'
 import { ProductDialog } from './products/product-dialog'
 import { LabelSheet } from './products/label-sheet'
+import { ImportDialog } from './products/import-dialog'
 
 type Quick = 'all' | 'low' | 'out'
 type SortKey = 'name' | 'stock' | 'price'
@@ -90,6 +92,7 @@ export default function ProductsView() {
   const [archivePending, setArchivePending] = useState(false)
   const [labelTarget, setLabelTarget] = useState<Product | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   function openCreate() {
     setEditing(null)
@@ -148,12 +151,25 @@ export default function ProductsView() {
               <span className="hidden sm:inline">Export CSV</span>
               <span className="sm:hidden">CSV</span>
             </Button>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="size-4" />
+              <span className="hidden sm:inline">Import</span>
+            </Button>
             <Button onClick={openCreate}>
               <Plus className="size-4" />
               Add product
             </Button>
           </>
         }
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => {
+          refetch()
+          refetchCategories()
+        }}
       />
 
       {error && !data ? (

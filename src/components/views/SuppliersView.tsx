@@ -98,7 +98,7 @@ export default function SuppliersView() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {suppliers.map((s) => (
-            <Card key={s.id} className="p-4 sm:p-5 flex flex-col gap-3">
+            <Card key={s.id} className="p-4 sm:p-5 flex flex-col gap-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold leading-tight truncate" title={s.name}>

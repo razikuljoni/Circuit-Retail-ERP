@@ -188,6 +188,34 @@ export async function POST(req: NextRequest) {
         throw new Error('Credit sales (partial payment) require a customer — select one at the top of the cart')
       }
 
+      // Credit-limit enforcement: new due + existing outstanding must fit the ceiling
+      const newDue = Math.max(0, round2(total - paid))
+      if (newDue > 0 && body.customerId) {
+        const customer = await tx.customer.findUnique({
+          where: { id: body.customerId },
+          select: { name: true, creditLimit: true },
+        })
+        if (!customer) throw new Error('Selected customer no longer exists — refresh and try again')
+        if (customer.creditLimit !== null && customer.creditLimit !== undefined) {
+          const outstandingRows = await tx.sale.findMany({
+            where: { customerId: body.customerId, status: 'COMPLETED' },
+            select: { total: true, paid: true },
+          })
+          const outstanding = round2(
+            outstandingRows.reduce((sum, s) => sum + Math.max(0, s.total - s.paid), 0)
+          )
+          const limit = round2(customer.creditLimit)
+          if (round2(outstanding + newDue) > limit + 0.001) {
+            const remaining = Math.max(0, round2(limit - outstanding))
+            throw new Error(
+              `Credit limit exceeded for ${customer.name} — limit ${limit.toFixed(2)}, ` +
+                `already due ${outstanding.toFixed(2)}, only ${remaining.toFixed(2)} available. ` +
+                `Collect the balance or raise the limit in Customers.`
+            )
+          }
+        }
+      }
+
       // ── Invoice number: INV-YYYYMMDD-#### (sequence per Dhaka day) ──
       const now = new Date()
       const prefix = `INV-${dhakaDateKey(now).replace(/-/g, '')}-`
@@ -248,7 +276,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(full ? { ...full, due: dueOf(full) } : full, { status: 201 })
   } catch (e) {
     if (e instanceof z.ZodError) return bad(zodMsg(e))
-    if (e instanceof Error && e.message.startsWith('Credit sales')) return bad(e.message)
+    if (e instanceof Error && (e.message.startsWith('Credit sales') || e.message.startsWith('Credit limit exceeded') || e.message.startsWith('Selected customer'))) {
+      return bad(e.message)
+    }
     console.error('POST /api/sales error:', e)
     return bad('Failed to create sale', 500)
   }

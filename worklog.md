@@ -271,3 +271,39 @@ Stage Summary:
 
 Recommended next phase:
 - Supplier-level PO grouping UX (one PO per supplier from a single click on dashboard low-stock strip), PO PDF/receipt print, customer credit LIMITS + aging report, expense attachments, PDF/Excel report export, bulk product import CSV parser, multi-user/auth pass
+
+---
+Task ID: 11 (cron round 4)
+Agent: Z (main)
+Task: Status assessment + agent-browser QA + 3 new features (bulk CSV import, credit limits + aging, one-click draft POs) + styling polish
+
+Work Log — status assessment:
+- Baseline healthy: all 10 views render live data, 0 console errors (agent-browser sweep desktop + mobile), lint 0 errors, all API 200; POS golden path re-verified in-browser (cart build → totals → Charge enabled)
+- App had evolved past worklog round 3 with POs/Z-report/cash-drawer already live (documented); dev server was stale-cached after schema push → restarted via (setsid bun run dev &) double-fork
+
+Work Log — bugs found & fixed:
+1. REAL BUG (pre-existing): GET /api/products?lowStock=1 pre-filtered SQL to stock<=0, so "low but positive" products never matched and the JS refinement (stock<=reorderLevel) was dead code for them. Products view "Low" toggle + anything using lowStock=1 silently missed low-stock-but-positive items. Fixed: no SQL stock pre-filter when lowStock=1, full scan then JS filter, limit applied after; outOfStock keeps SQL filter. Verified: returns both demo low items (13/15, 6/8)
+
+Work Log — new features shipped:
+1. BULK PRODUCT IMPORT: new POST /api/products/import (up to 500 rows, zod-validated per row with per-row errors, in-file duplicate SKU/barcode detection, cost>price rejection, category match-or-autocreate by name, supplier match by name, SKU collision modes skip|update, transactional with IMPORT StockMovement rows, auto SKU generation when missing). New products/import-csv.ts (dependency-free CSV parser: quotes/escaped quotes, CRLF, delimiter sniffing comma/tab/semicolon, header aliases name/product, cost/costprice/buy, reorder/min/…, 500-row cap) + products/import-dialog.tsx (paste-or-file tabs with drag&drop, live preview table with money formatting, parse warnings list, template download, skip|update radio, result panel with created/updated/skipped/rejected + first errors, disabled after success). Browser-verified: paste 3 rows → preview → import → toast "2 created, 1 skipped" (STA-001 skipped) → products list updated. NOTE: API rows use API field names (costPrice/price/stock/reorderLevel) — raw curl with CSV column names coerces undefined→NaN error (expected zod behavior, dialog maps fields correctly)
+2. CUSTOMER CREDIT LIMITS + AGING: Customer.creditLimit Float? (schema pushed, dev server restarted for fresh client). POST/PUT /api/customers accept nullable creditLimit (zod coerce nullable+optional verified: null stays null, not 0). POST /api/sales enforces inside transaction: newDue + outstanding(COMPLETED, paid<total) > creditLimit → friendly 400 naming limit/due/available. GET /api/customers passes creditLimit through (auto). New GET /api/customers/aging → per-customer outstanding bucketed by invoice age (≤30 / 31–60 / 61–90 / 90+, Dhaka days), totals + oldest-days, sorted desc. UI: customer dialog creditLimit field (empty = no limit); customer cards show LIMIT ৳X LEFT badge (green/red at cap) + limit badge always; Customers header "Aging" button with ৳1.8k dues badge → AgingDialog (sticky-header table, bucket columns color-graded amber→red, EmptyState when clean); checkout-dialog takes customers prop → live "Credit remaining" panel (emerald when fits, red blocked + confirm disabled when over); PosView passes customers through. Curl-verified: over-limit sale 400 with exact message; within-limit 201 due=1780; aging shows Farhana 1780/limit 2000. Browser-verified both dialog states (red blocked ৳290 due vs green ৳90 due) via LED Bulb + Farhana
+3. ONE-CLICK DRAFT POs FROM DASHBOARD: new POST /api/purchase-orders/bulk-draft {productIds} → re-validates low stock server-side, skips no-supplier/recovered products, groups by supplier, suggested qty = max(2×reorder − stock, 10), creates one DRAFT PO per supplier (per-day poNo sequence inside transaction) with note "Auto-drafted from dashboard low-stock alerts". Dashboard LowStockCard: "Draft POs" button → ConfirmDialog (destructive=false, explains grouping + qty rule) → POST → toast with per-PO summary (poNo · supplier · items · est. total) → auto-navigates to Inventory. Browser-verified: 2 low items → 2 supplier drafts created (est. ৳9,605) → landed on Inventory with toast. ListCard gained footerExtra slot for the action button
+
+Work Log — styling polish (mandatory):
+- PageHeader icon chip: gradient (from-primary/20 via-primary/10 to-primary/5) + inset ring + shadow — applies to all 10 views
+- POS product cards: hover lift (-translate-y-0.5 + shadow-md + border-primary/40) with active press settle; price tracking-tight
+- Customer + supplier cards: same hover-lift treatment (transition-all, consistent 150ms)
+- Draft-POs confirm uses primary (non-destructive) styling
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF watch warning); bunx tsc --noEmit: 0 errors in src/
+- agent-browser: import dialog flow, aging dialog (light + dark), Draft POs flow, POS credit guard both states, full 10-view sweep → 0 console errors; mobile 390px customers shows DUE + LIMIT badges cleanly
+- dev.log clean (all 200/201, no compile errors)
+
+Stage Summary:
+- Data delta (intentional demo state): Farhana Akter creditLimit=2000 with ৳1,780 due (INV-20260927-0002, demos DUE/LIMIT badges + aging); 2 DRAFT POs PO-20260927-0004/0005 (demos the dashboard flow); products MS-201 Gaming Mouse + KB-330 Mechanical Keyboard imported via the real UI; Ballpoint Pen Pack stock 13/15 and Bluetooth Speaker 6/8 low (QA-DEMO damage movements) — all realistic demo data, kept on purpose
+- New backend surface: /api/products/import, /api/customers/aging, /api/purchase-orders/bulk-draft; Customer.creditLimit column; sales POST credit-limit enforcement
+- No known bugs; lint/tsc/browser clean
+
+Recommended next phase:
+- PDF/Excel report export (P&L, aging, inventory valuation), supplier-level "Suggest POs" inside Inventory low-stock tab reusing bulk-draft, expense recurring templates, multi-user/auth pass, product images, barcode-scanner keyboard wedge tuning in POS

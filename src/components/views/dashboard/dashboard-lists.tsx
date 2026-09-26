@@ -1,13 +1,17 @@
 'use client'
 
 // ── Dashboard: live lists (low stock, recent transactions, recent expenses) ──
-import { ArrowRight, CheckCircle2, ReceiptText, Wallet } from 'lucide-react'
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { ArrowRight, CheckCircle2, ClipboardList, ReceiptText, Wallet } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/page-bits'
+import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { CoverBadge } from '@/components/views/inventory/cover-badge'
+import { api } from '@/lib/api'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import type { DashboardData, Expense, Sale } from '@/lib/types'
 
@@ -27,6 +31,7 @@ function ListCard({
   description,
   count,
   footer,
+  footerExtra,
   children,
 }: {
   loading: boolean
@@ -34,8 +39,10 @@ function ListCard({
   description?: string
   count?: number
   footer?: { label: string; onClick: () => void }
+  footerExtra?: React.ReactNode
   children: React.ReactNode
 }) {
+  const hasFooter = footer !== undefined || footerExtra !== undefined
   return (
     <Card className="gap-4">
       <CardHeader>
@@ -46,12 +53,15 @@ function ListCard({
         {description && <CardDescription className="text-xs">{description}</CardDescription>}
       </CardHeader>
       <CardContent>{loading ? <ListCardSkeleton listHeight="max-h-64" /> : children}</CardContent>
-      {footer && (
+      {hasFooter && (
         <CardFooter className="border-t pt-4">
-          <Button variant="link" size="sm" className="h-8 px-0 text-xs" onClick={footer.onClick}>
-            {footer.label}
-            <ArrowRight className="size-3.5" aria-hidden />
-          </Button>
+          {footer && (
+            <Button variant="link" size="sm" className="h-8 px-0 text-xs" onClick={footer.onClick}>
+              {footer.label}
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Button>
+          )}
+          {footerExtra && <div className="ml-auto">{footerExtra}</div>}
         </CardFooter>
       )}
     </Card>
@@ -70,6 +80,34 @@ export function LowStockCard({
   onNavigate: () => void
 }) {
   const items = data?.lowStock ?? []
+  const [poConfirm, setPoConfirm] = useState(false)
+  const [drafting, setDrafting] = useState(false)
+
+  async function draftPOs() {
+    setDrafting(true)
+    try {
+      const res = await api.post<{
+        created: { poNo: string; supplierName: string; itemCount: number; totalCost: number }[]
+        skipped: { name: string; reason: string }[]
+      }>('/api/purchase-orders/bulk-draft', { productIds: items.map((p) => p.id) })
+      const total = res.created.reduce((s, po) => s + po.totalCost, 0)
+      toast.success(
+        `${res.created.length} draft PO${res.created.length === 1 ? '' : 's'} created`,
+        {
+          description:
+            res.created.map((po) => `${po.poNo} · ${po.supplierName} (${po.itemCount} items)`).join(' · ') +
+            (total > 0 ? ` — est. ${fmtMoney(total)}` : '') +
+            (res.skipped.length ? ` · ${res.skipped.length} skipped` : ''),
+        }
+      )
+      setPoConfirm(false)
+      onNavigate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to draft purchase orders')
+    } finally {
+      setDrafting(false)
+    }
+  }
 
   return (
     <ListCard
@@ -78,6 +116,14 @@ export function LowStockCard({
       description="Products at or below their reorder level"
       count={items.length}
       footer={items.length > 0 ? { label: 'Open inventory', onClick: onNavigate } : undefined}
+      footerExtra={
+        items.length > 0 ? (
+          <Button size="sm" className="h-8 text-xs" onClick={() => setPoConfirm(true)}>
+            <ClipboardList className="size-3.5" />
+            Draft POs
+          </Button>
+        ) : undefined
+      }
     >
       {items.length === 0 ? (
         <EmptyState
@@ -124,6 +170,16 @@ export function LowStockCard({
           })}
         </ul>
       )}
+      <ConfirmDialog
+        open={poConfirm}
+        onOpenChange={setPoConfirm}
+        title="Draft purchase orders?"
+        message={`${items.length} low-stock item${items.length === 1 ? '' : 's'} will be grouped by supplier into DRAFT purchase orders (suggested qty = 2× reorder level). Review and receive them in Inventory → Purchase orders.`}
+        confirmLabel={drafting ? 'Drafting…' : 'Create drafts'}
+        destructive={false}
+        pending={drafting}
+        onConfirm={draftPOs}
+      />
     </ListCard>
   )
 }

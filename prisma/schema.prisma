@@ -73,15 +73,16 @@ model StockMovement {
 // ─────────────── People ───────────────
 
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  notes     String?
-  sales     Sale[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  creditLimit Float?
+  sales       Sale[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ─────────────── Sales ───────────────
