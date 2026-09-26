@@ -12,15 +12,18 @@ interface StatCardProps {
   icon: LucideIcon
   hint?: string
   trend?: { value: number; label?: string } // percent vs previous; +/- shows arrow
+  /** When true, an INCREASE is bad (red) and a decrease is good (green) — e.g. expenses. */
+  trendDownIsGood?: boolean
   iconClassName?: string
   className?: string
   /** Optional top accent bar (Tailwind bg classes), e.g. 'bg-emerald-400/70' */
   accent?: string
 }
 
-export function StatCard({ title, value, icon: Icon, hint, trend, iconClassName, className, accent }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, hint, trend, trendDownIsGood, iconClassName, className, accent }: StatCardProps) {
   const trendUp = (trend?.value ?? 0) > 0
   const trendFlat = Math.abs(trend?.value ?? 0) < 0.05
+  const trendGood = trendDownIsGood ? !trendUp : trendUp
   return (
     <Card className={cn('relative overflow-hidden shadow-sm hover:shadow-md transition-shadow', className)}>
       {accent && <span aria-hidden className={cn('absolute inset-x-0 top-0 h-[3px]', accent)} />}
@@ -34,7 +37,7 @@ export function StatCard({ title, value, icon: Icon, hint, trend, iconClassName,
             {(hint || trend) && (
               <div className="mt-1.5 flex items-center gap-1.5 text-[11px] sm:text-xs text-muted-foreground">
                 {trend && !trendFlat && (
-                  <span className={cn('inline-flex items-center gap-0.5 font-medium shrink-0', trendUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                  <span className={cn('inline-flex items-center gap-0.5 font-medium shrink-0', trendGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                     {trendUp ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
                     {Math.abs(trend!.value).toFixed(0)}%
                   </span>
@@ -44,7 +47,7 @@ export function StatCard({ title, value, icon: Icon, hint, trend, iconClassName,
                     <Minus className="size-3.5" /> 0%
                   </span>
                 )}
-                {hint && <span className="truncate">{hint}</span>}
+                {hint && <span className="min-w-0 whitespace-normal leading-snug">{hint}</span>}
               </div>
             )}
           </div>

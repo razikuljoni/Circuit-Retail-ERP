@@ -258,3 +258,43 @@
     page-break-inside: avoid;
   }
 }
+
+/* ── Z-Report printing (round 3) — clone on <body>, A4 paper ── */
+.zreport-print-area {
+  display: none;
+}
+
+@media print {
+  body.printing-zreport *:not(.zreport-print-area):not(.zreport-print-area *) {
+    display: none !important;
+  }
+  body.printing-zreport {
+    background: #fff !important;
+  }
+  body.printing-zreport .zreport-print-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 10mm 6mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body.printing-zreport .zreport-print-area * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: #94a3b8 !important;
+  }
+  body.printing-zreport .zreport-print-area .zr-bar {
+    background: #334155 !important;
+    border: 0 !important;
+  }
+}
+
+/* zreport v2 trigger */

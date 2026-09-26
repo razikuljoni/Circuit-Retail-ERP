@@ -8,8 +8,9 @@ import {
   dayRangeFromKeys,
   dayKeysBetween,
   dayKeyLabel,
+  dhakaHour,
 } from '@/lib/api-utils'
-import { dhakaDateKey } from '@/lib/format'
+import { dhakaDateKey, dayKeyToUTCStart, dayKeyToUTCEnd } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,8 @@ export async function GET(req: NextRequest) {
     if (type === 'pnl') return NextResponse.json(await pnlReport(start, end, fromKey, toKey))
     if (type === 'products') return NextResponse.json(await productPerformance(start, end))
     if (type === 'daily') return NextResponse.json(await dailyReport(start, end))
-    return bad(`Unknown report type "${type}" (expected pnl | products | daily)`)
+    if (type === 'zreport') return NextResponse.json(await zReport(fromKey))
+    return bad(`Unknown report type "${type}" (expected pnl | products | daily | zreport)`)
   } catch (e) {
     console.error('GET /api/reports error:', e)
     return bad('Failed to build report', 500)
@@ -114,6 +116,120 @@ async function productPerformance(start: Date, end: Date) {
     }))
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 50)
+}
+
+// ── Z-Report: single-day end-of-day summary (Dhaka day key) ────────────────
+
+async function zReport(dateKey: string) {
+  const start = dayKeyToUTCStart(dateKey)
+  const end = dayKeyToUTCEnd(dateKey)
+
+  const [sales, expenses, items] = await Promise.all([
+    db.sale.findMany({
+      where: { createdAt: { gte: start, lt: end } },
+      select: {
+        status: true,
+        total: true,
+        discount: true,
+        tax: true,
+        costTotal: true,
+        profit: true,
+        paid: true,
+        paymentMethod: true,
+        createdAt: true,
+      },
+    }),
+    db.expense.findMany({
+      where: { spentAt: { gte: start, lt: end } },
+      select: { amount: true, paymentMethod: true },
+    }),
+    db.saleItem.findMany({
+      where: { sale: { status: 'COMPLETED', createdAt: { gte: start, lt: end } } },
+      select: { name: true, sku: true, qty: true, total: true },
+    }),
+  ])
+
+  let gross = 0
+  let discounts = 0
+  let tax = 0
+  let costTotal = 0
+  let grossProfit = 0
+  let refunds = 0
+  let refundCount = 0
+  let transactions = 0
+  let itemsSold = 0
+  const methodMap = new Map<string, { amount: number; count: number }>()
+  const hourly = Array.from({ length: 24 }, (_, h) => ({
+    hour: String(h),
+    label: `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`,
+    sales: 0,
+    transactions: 0,
+  }))
+
+  for (const s of sales) {
+    if (s.status === 'COMPLETED') {
+      transactions += 1
+      gross += s.total
+      discounts += s.discount
+      tax += s.tax
+      costTotal += s.costTotal
+      grossProfit += s.profit
+      const m = methodMap.get(s.paymentMethod) ?? { amount: 0, count: 0 }
+      m.amount += s.total
+      m.count += 1
+      methodMap.set(s.paymentMethod, m)
+      const h = dhakaHour(s.createdAt)
+      hourly[h].sales += s.total
+      hourly[h].transactions += 1
+    } else {
+      refunds += s.total
+      refundCount += 1
+    }
+  }
+
+  const itemMap = new Map<string, { name: string; sku: string; qty: number; revenue: number }>()
+  for (const it of items) {
+    itemsSold += it.qty
+    const key = it.sku || it.name
+    const entry = itemMap.get(key) ?? { name: it.name, sku: it.sku, qty: 0, revenue: 0 }
+    entry.qty += it.qty
+    entry.revenue += it.total
+    itemMap.set(key, entry)
+  }
+
+  const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0)
+  const cashExpenses = expenses
+    .filter((e) => e.paymentMethod === 'CASH')
+    .reduce((s, e) => s + e.amount, 0)
+  const cashSales = methodMap.get('CASH')?.amount ?? 0
+
+  return {
+    date: dateKey,
+    label: dayKeyLabel(dateKey),
+    transactions,
+    itemsSold: round2(itemsSold),
+    gross: round2(gross),
+    discounts: round2(discounts),
+    refunds: round2(refunds),
+    refundCount,
+    netSales: round2(gross - refunds),
+    tax: round2(tax),
+    costTotal: round2(costTotal),
+    grossProfit: round2(grossProfit),
+    expensesTotal: round2(expensesTotal),
+    netProfit: round2(grossProfit - expensesTotal),
+    avgBasket: transactions > 0 ? round2(gross / transactions) : 0,
+    byMethod: [...methodMap.entries()]
+      .map(([method, v]) => ({ method, amount: round2(v.amount), count: v.count }))
+      .sort((a, b) => b.amount - a.amount),
+    cashExpenses: round2(cashExpenses),
+    expectedCash: round2(cashSales - cashExpenses),
+    hourly: hourly.map((h) => ({ ...h, sales: round2(h.sales) })),
+    topItems: [...itemMap.values()]
+      .map((v) => ({ ...v, qty: round2(v.qty), revenue: round2(v.revenue) }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 8),
+  }
 }
 
 async function dailyReport(start: Date, end: Date) {

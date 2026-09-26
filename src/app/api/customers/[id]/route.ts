@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         sales: {
           orderBy: { createdAt: 'desc' },
           take: 20,
-          select: { id: true, invoiceNo: true, total: true, createdAt: true, status: true },
+          select: { id: true, invoiceNo: true, total: true, paid: true, createdAt: true, status: true },
         },
       },
     })
@@ -31,9 +31,17 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       where: { customerId: id, status: 'COMPLETED' },
     })
 
+    const totalDue = round2(
+      customer.sales
+        .filter((s) => s.status === 'COMPLETED' && s.total - s.paid > 0.001)
+        .reduce((sum, s) => sum + (s.total - s.paid), 0)
+    )
+
     return NextResponse.json({
       ...customer,
+      sales: customer.sales.map((s) => ({ ...s, due: Math.max(0, round2(s.total - s.paid)) })),
       totalSpent: round2(spentAgg._sum.total ?? 0),
+      totalDue,
       lastPurchaseAt: customer.sales[0]?.createdAt?.toISOString() ?? null,
     })
   } catch (e) {

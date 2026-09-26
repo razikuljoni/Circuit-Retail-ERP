@@ -318,14 +318,17 @@ export default function ExpensesView() {
                         <div key={c.categoryId ?? c.name}>
                           <div className="flex items-center justify-between gap-2 mb-1.5">
                             <span className="inline-flex items-center gap-1.5 text-sm min-w-0">
-                              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: color }} aria-hidden />
-                              <span className="truncate">{c.name}</span>
+                              <span className="size-2.5 rounded-full shrink-0 ring-2 ring-background" style={{ backgroundColor: color }} aria-hidden />
+                              <span className="truncate font-medium">{c.name}</span>
+                              <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">
+                                {share.toFixed(0)}%
+                              </span>
                             </span>
                             <span className="text-sm font-semibold tabular-nums shrink-0">{fmtMoney(c.amount)}</span>
                           </div>
-                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden" role="presentation">
+                          <div className="h-2.5 w-full rounded-full bg-muted/80 overflow-hidden shadow-inner" role="presentation">
                             <div
-                              className="h-full rounded-full transition-all"
+                              className="h-full rounded-full transition-all duration-500 shadow-sm"
                               style={{ width: `${share}%`, backgroundColor: color }}
                             />
                           </div>

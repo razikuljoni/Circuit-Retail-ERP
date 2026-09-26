@@ -27,6 +27,7 @@ model Supplier {
   address   String?
   notes     String?
   products  Product[]
+  purchaseOrders PurchaseOrder[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -50,6 +51,7 @@ model Product {
   isActive     Boolean  @default(true)
   saleItems    SaleItem[]
   movements    StockMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -120,6 +122,33 @@ model SaleItem {
   tax       Float   @default(0)
   total     Float   // net line total incl. discount & tax
   costPrice Float   @default(0) // snapshot
+}
+
+// ─────────────── Purchasing ───────────────
+
+model PurchaseOrder {
+  id         String             @id @default(cuid())
+  poNo       String             @unique // PO-YYYYMMDD-####
+  supplierId String?
+  supplier   Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  status     String             @default("DRAFT") // DRAFT | ORDERED | RECEIVED | CANCELLED
+  note       String?
+  items      PurchaseOrderItem[]
+  receivedAt DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+}
+
+model PurchaseOrderItem {
+  id        String        @id @default(cuid())
+  poId      String
+  po        PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String // snapshot
+  sku       String // snapshot
+  qty       Float
+  unitCost  Float         @default(0)
 }
 
 // ─────────────── Expenses ───────────────

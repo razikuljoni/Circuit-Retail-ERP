@@ -5,7 +5,7 @@
 // close and every open starts from a fresh "paid" state (no reset effects).
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { BadgeCheck, HandCoins } from 'lucide-react'
+import { BadgeCheck, HandCoins, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/shared/page-bits'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { fmtMoney } from '@/lib/format'
 import type { Sale } from '@/lib/types'
 import { useMutation } from '@/hooks/use-api'
@@ -68,6 +69,9 @@ function CheckoutForm({
   const paidNum = round2(Number(paidText) || 0)
   const diff = round2(paidNum - totals.total)
   const due = Math.max(0, round2(totals.total - paidNum))
+  // Credit sales: partial payment is allowed when the sale is attached to a customer
+  const creditAllowed = customerId !== null && customerId !== undefined && customerId !== ''
+  const creditBlocked = due > 0 && !creditAllowed
 
   /** Exact + next round numbers (100/200/500/1000/2000 ceilings). */
   const quickCash = useMemo(() => {
@@ -97,12 +101,15 @@ function CheckoutForm({
 
   const handleConfirm = async () => {
     if (cart.length === 0) return
-    if (paymentMethod === 'CASH' && due > 0) return
+    if (due > 0 && !creditAllowed) return
     try {
       const sale = await createSale.run()
       if (!sale) return
       toast.success(`Sale ${sale.invoiceNo} completed`, {
-        description: `${fmtMoney(sale.total)} · ${sale.items.length} line item${sale.items.length === 1 ? '' : 's'}`,
+        description:
+          due > 0
+            ? `${fmtMoney(sale.total)} · ${(sale.due ?? due) > 0 ? `${fmtMoney(sale.due ?? due)} due on account` : ''}`
+            : `${fmtMoney(sale.total)} · ${sale.items.length} line item${sale.items.length === 1 ? '' : 's'}`,
       })
       clearCart()
       onOpenChange(false)
@@ -112,7 +119,7 @@ function CheckoutForm({
     }
   }
 
-  const canConfirm = cart.length > 0 && !createSale.pending && (paymentMethod !== 'CASH' || due <= 0)
+  const canConfirm = cart.length > 0 && !createSale.pending && (due <= 0 || creditAllowed)
 
   return (
     <div className="flex flex-col gap-4">
@@ -127,19 +134,30 @@ function CheckoutForm({
       </DialogHeader>
 
       {/* Due / change */}
-      <div className="flex items-center justify-between rounded-lg bg-muted/60 px-4 py-3">
+      <div
+        className={cn(
+          'flex items-center justify-between rounded-lg px-4 py-3',
+          creditBlocked
+            ? 'bg-destructive/10'
+            : due > 0
+              ? 'bg-amber-500/10'
+              : 'bg-muted/60'
+        )}
+      >
         <div>
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            {due > 0 && paymentMethod === 'CASH' ? 'Due' : 'Change'}
+            {due > 0 ? (creditAllowed ? 'Due on account' : 'Unpaid — needs full payment') : 'Change'}
           </p>
           <p
             className={`text-2xl font-bold tabular-nums ${
-              due > 0 && paymentMethod === 'CASH'
-                ? 'text-red-600 dark:text-red-400'
+              due > 0
+                ? creditAllowed
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400'
                 : 'text-emerald-600 dark:text-emerald-400'
             }`}
           >
-            {due > 0 && paymentMethod === 'CASH' ? fmtMoney(due) : fmtMoney(Math.max(0, diff))}
+            {due > 0 ? fmtMoney(due) : fmtMoney(Math.max(0, diff))}
           </p>
         </div>
         <div className="text-right">
@@ -147,6 +165,14 @@ function CheckoutForm({
           <p className="text-sm font-semibold tabular-nums">{fmtMoney(paidNum)}</p>
         </div>
       </div>
+
+      {/* Credit hint when a partial payment is blocked */}
+      {creditBlocked && (
+        <p className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <UserRound className="size-3.5 shrink-0" aria-hidden />
+          Select a customer in the cart panel to record the {fmtMoney(due)} balance as credit (due).
+        </p>
+      )}
 
       {/* Quick cash chips (CASH only) */}
       {paymentMethod === 'CASH' && (
@@ -182,6 +208,11 @@ function CheckoutForm({
           className="h-12 text-right text-lg font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           onChange={(e) => setPaidText(e.target.value)}
         />
+        {creditAllowed && (
+          <p className="text-[11px] text-muted-foreground">
+            Tip: enter less than the total to leave the rest as credit due on the customer's account.
+          </p>
+        )}
       </div>
 
       <DialogFooter className="gap-2 sm:gap-2">
@@ -201,6 +232,9 @@ function CheckoutForm({
           ) : (
             <>
               <BadgeCheck className="size-4" /> Confirm {fmtMoney(totals.total)}
+              {due > 0 && creditAllowed && (
+                <span className="ml-1 font-semibold text-amber-300">· {fmtMoney(due)} due</span>
+              )}
             </>
           )}
         </Button>

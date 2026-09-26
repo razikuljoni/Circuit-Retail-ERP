@@ -164,6 +164,7 @@ export function PaymentMixCard({ data, loading }: { data: DashboardData | null; 
       ) satisfies ChartConfig,
     [mix]
   )
+  const methodLabels = useMemo(() => Object.fromEntries(mix.map((m) => [m.method, m.method])), [mix])
 
   return (
     <ChartCard loading={loading} title="Payment mix (today)" description="How customers paid today">
@@ -173,7 +174,7 @@ export function PaymentMixCard({ data, loading }: { data: DashboardData | null; 
             <PieChart>
               <ChartTooltip
                 cursor={false}
-                content={<ChartTooltipContent hideLabel formatter={moneyFormatter(config as Record<string, string>)} />}
+                content={<ChartTooltipContent hideLabel formatter={moneyFormatter(methodLabels)} />}
               />
               <Pie
                 data={mix}

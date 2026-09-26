@@ -229,3 +229,45 @@ Stage Summary:
 
 Recommended next phase:
 - Purchase orders (supplier-level restock basket from low-stock list), daily Z-report modal in Sales, customer credit/dues tracking, expense attachments/notes search, PDF report export
+
+---
+Task ID: 10 (cron round 3)
+Agent: Z (main)
+Task: Status assessment + agent-browser QA + 3 new features (Z-report, purchase orders, customer dues) + styling polish
+
+Work Log — status assessment:
+- Baseline healthy at start: all 10 views render live data (desktop 1280 / mobile 390 / dark mode), 0 console/page errors, lint 0 errors, /api/dashboard 200
+- False alarm investigated: "Last 14 days" chart looked empty in a screenshot — was captured mid recharts animation; DOM inspection confirmed 28 bar rects with proper heights/fills. No bug.
+- Dev server had to be restarted mid-round (Prisma client cached in memory lacked new PO models); restarted detached via subshell — note for future agents: plain `setsid ... &` dies between tool sessions, use `(setsid cmd &)` double-fork pattern
+
+Work Log — bugs fixed (found during QA/code review):
+1. REAL DATA BUG: POST /api/sales never wrote SaleItem.costPrice (DB default 0) → product-performance report margins overstated for API-created sales. Added costPrice to itemRows + one-off backfill script scripts/backfill-cost.ts (run once: "backfilled 1 of 1")
+2. Latent runtime crash: src/store/pos.ts used toast.warn (doesn't exist in sonner) → would TypeError on stock-limit warnings; replaced with toast.warning (2 sites)
+3. Latent tooltip crash: PaymentMixCard passed ChartConfig object into moneyFormatter expecting string labels → tooltip would render "[object Object]"; fixed with dedicated methodLabels map
+4. Missing TS import: command-palette.tsx used Plus without importing (tsc-only error, lint missed it)
+5. Duplicate `import { toast }` in CustomersView after edit (caught by tsc)
+6. Z-report print clone was visible on screen (Turbopack didn't hot-reload globals.css; browser profile also caches CSS) → made hiding cache-proof with inline display:none; print CSS uses !important so it still prints
+
+Work Log — new features shipped:
+1. Z-REPORT (end-of-day): new GET /api/reports?type=zreport&from=YYYY-MM-DD — per-day register summary (gross/discounts/refunds/tax/COGS/grossProfit/expenses/netProfit/avgBasket/itemsSold, byMethod splits, cash-drawer reconciliation (cash sales − cash expenses = expected cash), 24-hour buckets, top-8 items by qty). New src/components/views/sales/z-report.tsx: date picker + scrollable body (max-h-[55vh] — fixed viewport overflow bug) + print button using body.printing-zreport clone pattern (A4, ink-friendly) + globals.css .zreport-print-area block. Button added to SalesView header.
+2. PURCHASE ORDERS: Prisma models PurchaseOrder/PurchaseOrderItem (poNo PO-YYYYMMDD-#### per Dhaka day, status DRAFT|ORDERED|RECEIVED|CANCELLED, item snapshots name/sku/qty/unitCost); schema pushed via db:push. New API: GET/POST /api/purchase-orders, GET/PUT/DELETE /api/purchase-orders/[id] (PUT uses nested items create/deleteMany; delete only DRAFT/CANCELLED), POST /api/purchase-orders/[id]/receive (transactional per-item stock increment + StockMovement('PURCHASE', ref poNo, note 'PO received') + optional per-line qty/cost overrides; updates product costPrice when provided). UI: 4th Inventory tab "Purchase orders" (inventory/purchase-orders.tsx): list table with status badges + per-row actions (Mark ordered / Receive / Cancel / Delete w/ ConfirmDialog); builder dialog with supplier select, product search picker, "Fill from low stock" (suggested qty = max(reorder×2 − stock, 10), editable qty/cost rows, running total, note, Save draft vs Place order). Browser-verified full lifecycle: create draft (10 items ৳5,01,700) → receive → stock value ৳4.2L→৳9.2L, low-stock 10→0, movements ledger shows PO refs.
+3. CUSTOMER CREDIT/DUES: Sale.due computed server-side (total − paid, clamped) and decorated on all sale responses; POST /api/sales rejects partial payment without customerId (exact in-transaction check + early rough check; friendly 400). GET /api/customers adds totalDue per customer; GET /api/customers/[id] adds paid/due per sale + totalDue. New POST /api/sales/[id]/settle {amount} (caps at outstanding, appends payment note) and POST /api/customers/[id]/settle-all (transactional, settles all outstanding). UI: checkout dialog now allows partial payment when a customer is selected (amber "Due on account" panel, confirm button shows "· ৳X due", blocked-with-hint panel when no customer); receipt shows "DUE (CREDIT)" instead of Change; sale detail shows Due (credit) row + "Settle ৳X" button; sales table CREDIT badge; customer cards DUE badge + "Settle dues" dropdown action; history dialog outstanding-due stat + per-invoice due badge + Settle buttons. Browser-verified: POS partial sale (560 total, 300 paid, 260 due) → CREDIT badge → settle from detail → all cleared.
+
+Work Log — styling polish (mandatory):
+- StatCard: hint no longer truncates mid-word (wraps, whitespace-normal leading-snug) — fixes "at or below reorder le…" clipping on Inventory; new trendDownIsGood prop so rising expenses show a red arrow (green previously), Expenses Today KPI now has a % trend like the other KPIs
+- Expenses "By category" bars: thicker (h-2.5), inner-shadow track, ring around color dot, bold label + explicit share % label, 500ms width transition
+- SalesView header: Z-Report + Export CSV grouped in a flex row
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF watch warning); bunx tsc --noEmit: 0 errors in src/ (remaining hits are pre-existing examples/skills dirs, not app code)
+- API curl suite: zreport (today + validations), PO create/receive/list, credit-sale guard 400 without customer, partial sale due=50, settle partial (due 50→20), settle-all (1 invoice settled) — all verified
+- Browser E2E: Z-report modal (desktop, scroll fixed), PO tab lifecycle, POS credit checkout, CREDIT/DUE badges, settle from detail — all green on light theme; mobile dashboard + POS spot-checked
+- Dev data delta: 2 POs (1 smoke-test received, 1 demo received ×10), 2 sales (1 settled credit sale INV-20260927-0001, all dues now 0) — clean demo state
+
+Stage Summary:
+- App now covers the full retail loop including purchasing and receivables: POS (cash/card/mobile + credit) → invoices/refunds → stock ledger → purchase orders → suppliers; expenses; dashboard + Z-report + P&L
+- New backend surface: /api/purchase-orders (+[id], +[id]/receive), /api/sales/[id]/settle, /api/customers/[id]/settle-all, /api/reports?type=zreport; customers/sales responses extended with totalDue/due
+- Known limitations: PO receive uses PO quantities (per-line overrides only via API body); settle uses "amount: MAX_SAFE_INTEGER" from UI for full settlement (server caps — partial UI settle possible via API); Z-report print layout is A4-oriented (thermal receipt style remains for invoices)
+
+Recommended next phase:
+- Supplier-level PO grouping UX (one PO per supplier from a single click on dashboard low-stock strip), PO PDF/receipt print, customer credit LIMITS + aging report, expense attachments, PDF/Excel report export, bulk product import CSV parser, multi-user/auth pass

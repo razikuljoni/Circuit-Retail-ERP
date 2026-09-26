@@ -9,6 +9,7 @@ import {
   CreditCard,
   Download,
   Eye,
+  FileBarChart2,
   Hash,
   ReceiptText,
   Search,
@@ -45,6 +46,7 @@ import type { PaymentMethod, Sale, SaleStatus } from '@/lib/types'
 import { useApi } from '@/hooks/use-api'
 import { ReceiptDialog } from '@/components/views/sales/receipt'
 import { SaleDetailDialog } from '@/components/views/sales/sale-detail'
+import { ZReportDialog } from '@/components/views/sales/z-report'
 
 const PAGE_SIZE = 15
 
@@ -89,6 +91,7 @@ export default function SalesView() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [zOpen, setZOpen] = useState(false)
 
   // Debounce the search box (350ms) before it hits the API.
   useEffect(() => {
@@ -230,10 +233,16 @@ export default function SalesView() {
         title="Sales & Invoices"
         subtitle="Browse, reprint or refund completed sales"
         actions={
-          <Button variant="outline" className="h-10" disabled={exporting} onClick={() => void exportCsv()}>
-            {exporting ? <Spinner className="size-4" /> : <Download className="size-4" aria-hidden />}
-            Export CSV
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="h-10" onClick={() => setZOpen(true)}>
+              <FileBarChart2 className="size-4" aria-hidden />
+              Z-Report
+            </Button>
+            <Button variant="outline" className="h-10" disabled={exporting} onClick={() => void exportCsv()}>
+              {exporting ? <Spinner className="size-4" /> : <Download className="size-4" aria-hidden />}
+              Export CSV
+            </Button>
+          </div>
         }
       />
 
@@ -421,6 +430,15 @@ export default function SalesView() {
                                 <Icon className="size-3" aria-hidden />
                                 {s.paymentMethod}
                               </Badge>
+                              {!refunded && (s.due ?? 0) > 0 && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-1.5 border-amber-500/40 bg-amber-500/10 text-[10px] font-semibold text-amber-700 dark:text-amber-400"
+                                  title="Partially paid — outstanding credit"
+                                >
+                                  CREDIT
+                                </Badge>
+                              )}
                             </TableCell>
                             <TableCell>
                               {refunded ? (
@@ -509,6 +527,7 @@ export default function SalesView() {
         onRefunded={handleRefunded}
       />
       <ReceiptDialog sale={receiptSale} onDone={() => setReceiptSale(null)} />
+      <ZReportDialog open={zOpen} onOpenChange={setZOpen} />
     </div>
   )
 }

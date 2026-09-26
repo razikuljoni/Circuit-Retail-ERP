@@ -70,6 +70,8 @@ export interface Customer {
   // aggregates from GET /api/customers (additive)
   totalSpent?: number
   lastPurchaseAt?: string | null
+  /** Outstanding credit = Σ(total − paid) across COMPLETED sales (additive) */
+  totalDue?: number
 }
 
 export interface SaleItem {
@@ -104,6 +106,8 @@ export interface Sale {
   status: SaleStatus
   note?: string | null
   createdAt: string
+  /** Outstanding credit (total − paid, when positive) — added by API responses */
+  due?: number
 }
 
 export interface ExpenseCategory {
@@ -225,4 +229,56 @@ export interface DailySalesRow {
   cogs: number
   profit: number
   expenses: number
+}
+
+// ── Purchase orders ──
+
+export type PurchaseOrderStatus = 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED'
+
+export interface PurchaseOrderItem {
+  id: string
+  poId?: string
+  productId: string
+  product?: { id: string; name: string; sku: string; unit: string; stock?: number }
+  name: string
+  sku: string
+  qty: number
+  unitCost: number
+}
+
+export interface PurchaseOrder {
+  id: string
+  poNo: string
+  supplierId?: string | null
+  supplier?: Supplier | null
+  status: PurchaseOrderStatus
+  note?: string | null
+  items: PurchaseOrderItem[]
+  receivedAt?: string | null
+  createdAt: string
+}
+
+// ── Z-Report (end-of-day) ──
+
+export interface ZReport {
+  date: string
+  label: string
+  transactions: number
+  itemsSold: number
+  gross: number
+  discounts: number
+  refunds: number
+  refundCount: number
+  netSales: number
+  tax: number
+  costTotal: number
+  grossProfit: number
+  expensesTotal: number
+  netProfit: number
+  avgBasket: number
+  byMethod: { method: string; amount: number; count: number }[]
+  cashExpenses: number
+  expectedCash: number
+  hourly: { hour: string; label: string; sales: number; transactions: number }[]
+  topItems: { name: string; sku: string; qty: number; revenue: number }[]
 }

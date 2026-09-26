@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Banknote,
   PackagePlus,
+  Plus,
   ReceiptText,
   ScanBarcode,
   Wallet,

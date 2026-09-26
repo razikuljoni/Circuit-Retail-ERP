@@ -149,10 +149,20 @@ export function ReceiptPaper({ sale }: { sale: Sale }) {
           <span>Paid ({sale.paymentMethod.toLowerCase()})</span>
           <span>{fmtMoney(sale.paid)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>Change</span>
-          <span>{fmtMoney(sale.change)}</span>
-        </div>
+        {(() => {
+          const due = Math.max(0, sale.total - sale.paid)
+          return due > 0 ? (
+            <div className="flex justify-between font-bold">
+              <span>DUE (CREDIT)</span>
+              <span>{fmtMoney(due)}</span>
+            </div>
+          ) : (
+            <div className="flex justify-between">
+              <span>Change</span>
+              <span>{fmtMoney(sale.change)}</span>
+            </div>
+          )
+        })()}
       </div>
 
       {sale.note ? (

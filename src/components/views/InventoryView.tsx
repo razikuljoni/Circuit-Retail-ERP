@@ -8,6 +8,7 @@ import {
   Package,
   PackagePlus,
   Plus,
+  ShoppingCart,
   SlidersHorizontal,
   Warehouse,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ import { PageHeader, EmptyState, ErrorState, ViewLoader } from '@/components/sha
 import { StatCard } from '@/components/shared/stat-card'
 import { AdjustDialog, type AdjustType } from './inventory/adjust-dialog'
 import { MovementBadge } from './inventory/movement-type'
+import { PurchaseOrdersPanel } from './inventory/purchase-orders'
 import { downloadMovementsCsv } from './inventory/csv'
 
 const LEDGER_PAGE = 50
@@ -179,7 +181,7 @@ export default function InventoryView() {
           </div>
 
           <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-            <TabsList className="h-10 w-full sm:w-auto sm:grid sm:grid-cols-3">
+            <TabsList className="h-10 w-full sm:w-auto sm:grid sm:grid-cols-4">
               <TabsTrigger value="levels">Stock levels</TabsTrigger>
               <TabsTrigger value="low">
                 Low stock
@@ -190,6 +192,10 @@ export default function InventoryView() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="ledger">Movement ledger</TabsTrigger>
+              <TabsTrigger value="orders">
+                <ShoppingCart className="size-3.5 sm:hidden" aria-hidden />
+                Purchase orders
+              </TabsTrigger>
             </TabsList>
 
             {/* ── Stock levels ── */}
@@ -495,6 +501,10 @@ export default function InventoryView() {
                   </>
                 )}
               </Card>
+            )}
+            {/* ── Purchase orders ── */}
+            {tab === 'orders' && (
+              <PurchaseOrdersPanel products={products} onDataChanged={() => { productsQ.refetch(); movementsQ.refetch() }} />
             )}
           </Tabs>
         </>

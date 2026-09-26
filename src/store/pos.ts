@@ -97,7 +97,7 @@ export const usePosStore = create<PosState>((set, get) => ({
     const existing = get().cart.find((i) => i.productId === product.id)
     if (existing) {
       if (existing.qty + 1 > existing.stock) {
-        toast.warn(`Only ${existing.stock} in stock`)
+        toast.warning(`Only ${existing.stock} in stock`)
         return
       }
       set({
@@ -134,7 +134,7 @@ export const usePosStore = create<PosState>((set, get) => ({
         if (next < MIN_QTY) next = MIN_QTY
         if (next > i.stock) {
           next = i.stock
-          toast.warn(`Only ${i.stock} in stock`)
+          toast.warning(`Only ${i.stock} in stock`)
         }
         return { ...i, qty: round2(next) }
       }),

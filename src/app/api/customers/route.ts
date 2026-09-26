@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         }
       : {}
 
-    const [customers, agg] = await Promise.all([
+    const [customers, agg, dueSales] = await Promise.all([
       db.customer.findMany({
         where,
         orderBy: { name: 'asc' },
@@ -27,6 +27,12 @@ export async function GET(req: NextRequest) {
         _sum: { total: true },
         _max: { createdAt: true },
         where: { status: 'COMPLETED', customerId: { not: null } },
+      }),
+      // Outstanding credit: COMPLETED sales where paid < total (column compare not
+      // supported by SQLite aggregate filters → compute in JS over customer sales only)
+      db.sale.findMany({
+        where: { status: 'COMPLETED', customerId: { not: null } },
+        select: { customerId: true, total: true, paid: true },
       }),
     ])
 
@@ -39,10 +45,18 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    const dueMap = new Map<string, number>()
+    for (const s of dueSales) {
+      if (!s.customerId) continue
+      const due = s.total - s.paid
+      if (due > 0.001) dueMap.set(s.customerId, (dueMap.get(s.customerId) ?? 0) + due)
+    }
+
     const withStats = customers.map((c) => ({
       ...c,
       totalSpent: spendMap.get(c.id)?.totalSpent ?? 0,
       lastPurchaseAt: spendMap.get(c.id)?.lastPurchaseAt ?? null,
+      totalDue: round2(dueMap.get(c.id) ?? 0),
     }))
 
     return NextResponse.json(withStats)

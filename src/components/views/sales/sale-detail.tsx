@@ -1,9 +1,9 @@
 'use client'
 
-// ── Sale detail (full invoice) — reprint receipt, refund with confirmation ────
+// ── Sale detail (full invoice) — reprint receipt, settle due, refund ──────
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Printer, Undo2 } from 'lucide-react'
+import { HandCoins, Printer, Undo2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,10 @@ import { fmtDateTime, fmtMoney, fmtQty } from '@/lib/format'
 import type { Sale } from '@/lib/types'
 import { useMutation } from '@/hooks/use-api'
 
+interface SettledSale extends Sale {
+  settledNow?: number
+}
+
 export function SaleDetailDialog({
   sale,
   open,
@@ -36,11 +40,30 @@ export function SaleDetailDialog({
   onRefunded: (sale: Sale) => void
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [settling, setSettling] = useState(false)
 
   const refund = useMutation(async () => {
     if (!sale) throw new Error('No sale selected')
     return api.post<Sale>(`/api/sales/${sale.id}/refund`)
   })
+
+  const settleDue = async () => {
+    if (!sale) return
+    setSettling(true)
+    try {
+      const updated = await api.post<SettledSale>(`/api/sales/${sale.id}/settle`, {
+        amount: Number.MAX_SAFE_INTEGER, // server caps at the outstanding balance
+      })
+      toast.success(`Payment recorded for ${updated.invoiceNo}`, {
+        description: `${fmtMoney(updated.settledNow ?? 0)} collected`,
+      })
+      onRefunded(updated) // reuse the live-update path (sale replaced)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to settle invoice')
+    } finally {
+      setSettling(false)
+    }
+  }
 
   const handleRefund = async () => {
     try {
@@ -163,10 +186,19 @@ export function SaleDetailDialog({
                     <span className="text-muted-foreground">Paid</span>
                     <span className="tabular-nums">{fmtMoney(sale.paid)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Change</span>
-                    <span className="tabular-nums">{fmtMoney(sale.change)}</span>
-                  </div>
+                  {(sale.due ?? 0) > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="font-medium text-amber-700 dark:text-amber-400">Due (credit)</span>
+                      <span className="font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                        {fmtMoney(sale.due ?? 0)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Change</span>
+                      <span className="tabular-nums">{fmtMoney(sale.change)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -174,6 +206,17 @@ export function SaleDetailDialog({
                 <Button variant="outline" className="h-11 sm:flex-1" onClick={() => onPrint(sale)}>
                   <Printer className="size-4" /> Print receipt
                 </Button>
+                {!refunded && (sale.due ?? 0) > 0 && (
+                  <Button
+                    variant="outline"
+                    className="h-11 border-emerald-500/50 sm:flex-1 hover:bg-emerald-500/10"
+                    disabled={settling}
+                    onClick={() => void settleDue()}
+                  >
+                    {settling ? <Spinner className="size-4" /> : <HandCoins className="size-4" />}
+                    Settle {fmtMoney(sale.due ?? 0)}
+                  </Button>
+                )}
                 {!refunded ? (
                   <Button
                     variant="destructive"

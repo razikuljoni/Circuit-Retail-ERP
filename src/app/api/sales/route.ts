@@ -25,6 +25,11 @@ const postSchema = z.object({
   note: z.string().max(1000).optional().nullable(),
 })
 
+/** Outstanding credit for a sale (total − paid, when positive). */
+function dueOf(s: { total: number; paid: number }): number {
+  return Math.max(0, round2(s.total - s.paid))
+}
+
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams
@@ -77,7 +82,7 @@ export async function GET(req: NextRequest) {
     ])
 
     return NextResponse.json({
-      sales,
+      sales: sales.map((s) => ({ ...s, due: dueOf(s) })),
       total: totalCount,
       summary: {
         count: completedAgg._count + refundedAgg._count,
@@ -121,6 +126,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Pre-compute rough total to enforce the credit rule (partial payment needs a customer)
+    if (body.paid !== undefined) {
+      let roughSubtotal = 0
+      for (const item of body.items) roughSubtotal += item.unitPrice * item.qty - (item.discount ?? 0)
+      const roughTotal = Math.max(0, round2(roughSubtotal - (body.orderDiscount ?? 0)))
+      if (round2(body.paid) < roughTotal - 0.001 && !body.customerId) {
+        return bad('Credit sales (partial payment) require a customer — select one at the top of the cart')
+      }
+    }
+
     const sale = await db.$transaction(async (tx) => {
       // ── Compute totals ──
       let subtotal = 0
@@ -158,6 +173,7 @@ export async function POST(req: NextRequest) {
           taxRate: product.taxRate ?? 0,
           tax: round2(lineTax),
           total: round2(lineTotal + lineTax),
+          costPrice: product.costPrice,
         })
       }
 
@@ -166,6 +182,11 @@ export async function POST(req: NextRequest) {
       const paid = body.paid ?? total
       const change = Math.max(0, round2(paid - total))
       const profit = round2(total - taxSum - costTotal)
+
+      // Exact credit rule: a partially-paid sale must belong to a customer
+      if (round2(paid) < total - 0.001 && !body.customerId) {
+        throw new Error('Credit sales (partial payment) require a customer — select one at the top of the cart')
+      }
 
       // ── Invoice number: INV-YYYYMMDD-#### (sequence per Dhaka day) ──
       const now = new Date()
@@ -224,9 +245,10 @@ export async function POST(req: NextRequest) {
       where: { id: sale.id },
       include: { items: true, customer: true },
     })
-    return NextResponse.json(full, { status: 201 })
+    return NextResponse.json(full ? { ...full, due: dueOf(full) } : full, { status: 201 })
   } catch (e) {
     if (e instanceof z.ZodError) return bad(zodMsg(e))
+    if (e instanceof Error && e.message.startsWith('Credit sales')) return bad(e.message)
     console.error('POST /api/sales error:', e)
     return bad('Failed to create sale', 500)
   }

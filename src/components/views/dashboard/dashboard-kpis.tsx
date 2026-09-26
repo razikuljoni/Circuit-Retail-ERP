@@ -56,6 +56,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
   const { today, yesterday, stockValue } = data
   const salesTrend = pctDelta(today.sales, yesterday.sales)
   const profitTrend = pctDelta(today.grossProfit, yesterday.grossProfit)
+  const expTrend = pctDelta(today.expenses, yesterday.expenses)
   const yNet = yesterday.grossProfit - yesterday.expenses
   const netTrend = pctDelta(today.netProfit, yNet)
   const netPositive = today.netProfit >= 0
@@ -90,6 +91,8 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         title="Expenses Today"
         value={fmtMoneyInt(today.expenses)}
         icon={Wallet}
+        trend={expTrend !== undefined ? { value: expTrend } : undefined}
+        trendDownIsGood
         hint={`vs yesterday ${fmtMoney(yesterday.expenses, { compact: true })}`}
         iconClassName="bg-amber-500/10"
         accent="bg-gradient-to-r from-amber-500/80 to-transparent"

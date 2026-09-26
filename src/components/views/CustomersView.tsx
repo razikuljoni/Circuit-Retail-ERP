@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
+  HandCoins,
   History,
   Mail,
   MoreVertical,
@@ -72,6 +73,24 @@ export default function CustomersView() {
   const [historyId, setHistoryId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const [settlingId, setSettlingId] = useState<string | null>(null)
+
+  async function settleAll(c: Customer) {
+    setSettlingId(c.id)
+    try {
+      const res = await api.post<{ settledCount: number; settledTotal: number }>(
+        `/api/customers/${c.id}/settle-all`
+      )
+      toast.success(`Settled ${res.settledCount} invoice${res.settledCount === 1 ? '' : 's'} for ${c.name}`, {
+        description: `${fmtMoney(res.settledTotal)} collected`,
+      })
+      refetch()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to settle dues')
+    } finally {
+      setSettlingId(null)
+    }
+  }
 
   function openCreate() {
     setEditing(null)
@@ -166,6 +185,11 @@ export default function CustomersView() {
                       <Mail className="size-3 shrink-0" aria-hidden /> {c.email}
                     </p>
                   ) : null}
+                  {(c.totalDue ?? 0) > 0 && (
+                    <Badge className="mt-1.5 border border-amber-500/40 bg-amber-500/10 text-[10px] font-bold text-amber-700 dark:text-amber-400" variant="outline">
+                      DUE {fmtMoney(c.totalDue ?? 0)}
+                    </Badge>
+                  )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -180,6 +204,15 @@ export default function CustomersView() {
                     <DropdownMenuItem onClick={() => setHistoryId(c.id)}>
                       <History className="size-3.5" /> History
                     </DropdownMenuItem>
+                    {(c.totalDue ?? 0) > 0 && (
+                      <DropdownMenuItem
+                        className="text-emerald-600 focus:text-emerald-600 dark:text-emerald-400 dark:focus:text-emerald-400"
+                        disabled={settlingId === c.id}
+                        onClick={() => void settleAll(c)}
+                      >
+                        <HandCoins className="size-3.5" /> Settle dues ({fmtMoney(c.totalDue ?? 0)})
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(c)}>
                       <Trash2 className="size-3.5" /> Delete
