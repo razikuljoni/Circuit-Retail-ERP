@@ -1,0 +1,217 @@
+// ── Shared types (mirrors Prisma models, JSON-serialized) ──
+
+export type PaymentMethod = 'CASH' | 'CARD' | 'MOBILE' | 'BANK'
+export type SaleStatus = 'COMPLETED' | 'REFUNDED'
+export type MovementType = 'PURCHASE' | 'SALE' | 'ADJUST' | 'DAMAGE' | 'RETURN' | 'REFUND'
+
+export interface Category {
+  id: string
+  name: string
+  description?: string | null
+  color?: string | null
+  _count?: { products: number }
+}
+
+export interface Supplier {
+  id: string
+  name: string
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  notes?: string | null
+  _count?: { products: number }
+}
+
+export interface Product {
+  id: string
+  sku: string
+  barcode?: string | null
+  name: string
+  description?: string | null
+  unit: string
+  categoryId?: string | null
+  category?: Category | null
+  supplierId?: string | null
+  supplier?: Supplier | null
+  costPrice: number
+  price: number
+  taxRate: number
+  stock: number
+  reorderLevel: number
+  isActive: boolean
+  createdAt?: string
+}
+
+export interface StockMovement {
+  id: string
+  productId: string
+  product?: { id: string; name: string; sku: string; unit: string }
+  type: MovementType
+  qty: number
+  before: number
+  after: number
+  reference?: string | null
+  note?: string | null
+  createdAt: string
+}
+
+export interface Customer {
+  id: string
+  name: string
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  notes?: string | null
+  _count?: { sales: number }
+  // aggregates from GET /api/customers (additive)
+  totalSpent?: number
+  lastPurchaseAt?: string | null
+}
+
+export interface SaleItem {
+  id: string
+  productId?: string | null
+  name: string
+  sku: string
+  qty: number
+  unitPrice: number
+  discount: number
+  taxRate: number
+  tax: number
+  total: number
+  costPrice: number
+}
+
+export interface Sale {
+  id: string
+  invoiceNo: string
+  customerId?: string | null
+  customer?: Customer | null
+  items: SaleItem[]
+  subtotal: number
+  discount: number
+  tax: number
+  total: number
+  paid: number
+  change: number
+  costTotal: number
+  profit: number
+  paymentMethod: PaymentMethod
+  status: SaleStatus
+  note?: string | null
+  createdAt: string
+}
+
+export interface ExpenseCategory {
+  id: string
+  name: string
+  color?: string | null
+  _count?: { expenses: number }
+  // current Dhaka-month expense total (additive, from GET /api/expense-categories)
+  monthTotal?: number
+}
+
+export interface Expense {
+  id: string
+  title: string
+  categoryId?: string | null
+  category?: ExpenseCategory | null
+  amount: number
+  paymentMethod: PaymentMethod
+  spentAt: string
+  reference?: string | null
+  note?: string | null
+}
+
+export interface StoreSettings {
+  id: string
+  storeName: string
+  address: string
+  phone: string
+  currency: string
+  currencyCode: string
+  taxRate: number
+  receiptFooter: string
+}
+
+// ── Cart (client-side) ──
+
+export interface CartItem {
+  key: string // productId (or productId+price for variants)
+  productId: string
+  name: string
+  sku: string
+  unit: string
+  unitPrice: number
+  costPrice: number
+  taxRate: number
+  qty: number
+  discount: number // line discount amount for the whole line
+  stock: number
+}
+
+export interface DashboardData {
+  today: {
+    sales: number
+    transactions: number
+    avgBasket: number
+    grossProfit: number
+    expenses: number
+    netProfit: number
+    discounts: number
+    refunds: number
+  }
+  yesterday: {
+    sales: number
+    transactions: number
+    grossProfit: number
+    expenses: number
+  }
+  hourly: { hour: string; label?: string; sales: number; transactions: number }[]
+  daily: { date: string; label: string; sales: number; expenses: number; profit: number }[]
+  paymentMix: { method: string; amount: number; count: number }[]
+  topProducts: { name: string; qty: number; revenue: number }[]
+  recentSales: Sale[]
+  recentExpenses: Expense[]
+  lowStock: Product[]
+  stockValue: { cost: number; retail: number; products: number; outOfStock: number; lowStock: number }
+}
+
+export interface PnlReport {
+  from: string
+  to: string
+  revenue: number
+  refunds: number
+  discounts: number
+  tax: number
+  cogs: number
+  grossProfit: number
+  expensesTotal: number
+  expensesByCategory: { name: string; color?: string | null; amount: number }[]
+  netProfit: number
+  transactions: number
+  avgBasket: number
+}
+
+export interface ProductPerformance {
+  id: string
+  name: string
+  sku: string
+  qty: number
+  revenue: number
+  profit: number
+  margin: number
+}
+
+export interface DailySalesRow {
+  date: string
+  label: string
+  transactions: number
+  gross: number
+  discounts: number
+  refunds: number
+  net: number
+  cogs: number
+  profit: number
+  expenses: number
+}
