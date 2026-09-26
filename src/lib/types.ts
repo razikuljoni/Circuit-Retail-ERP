@@ -39,6 +39,10 @@ export interface Product {
   stock: number
   reorderLevel: number
   isActive: boolean
+  /** Sales velocity (units/day, last 7 days) — added by GET /api/products */
+  avgDailyQty?: number
+  /** Estimated days until stock runs out at current velocity (null = no sales) */
+  daysCover?: number | null
   createdAt?: string
 }
 
@@ -150,6 +154,12 @@ export interface CartItem {
   stock: number
 }
 
+export interface CashDrawer {
+  cashSales: number
+  cashExpenses: number
+  expectedCash: number
+}
+
 export interface DashboardData {
   today: {
     sales: number
@@ -175,6 +185,7 @@ export interface DashboardData {
   recentExpenses: Expense[]
   lowStock: Product[]
   stockValue: { cost: number; retail: number; products: number; outOfStock: number; lowStock: number }
+  cashDrawer: CashDrawer
 }
 
 export interface PnlReport {

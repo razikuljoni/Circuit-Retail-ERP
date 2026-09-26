@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { AppHeader } from '@/components/app/app-header'
 import { AppSidebar } from '@/components/app/app-sidebar'
 import { AppFooter } from '@/components/app/app-footer'
+import { CommandPalette } from '@/components/app/command-palette'
 import { ViewSkeleton } from '@/components/app/view-skeleton'
 import { useUiStore, VIEW_KEYS, type ViewKey } from '@/store/ui'
 
@@ -90,6 +91,7 @@ export default function Shell() {
       </a>
 
       <AppHeader />
+      <CommandPalette />
 
       <div className="flex w-full flex-1">
         <AppSidebar />

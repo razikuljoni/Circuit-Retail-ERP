@@ -11,12 +11,14 @@ import {
   Menu,
   Moon,
   Plus,
+  Search,
   Store,
   Sun,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useUiStore } from '@/store/ui'
+import { openCommandPalette } from '@/components/app/command-palette'
 import { fmtDate, fmtTime } from '@/lib/format'
 import type { DashboardData, Product } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -222,6 +224,30 @@ export function AppHeader() {
 
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
           <LiveClock />
+
+          {/* Command palette trigger (Ctrl/⌘+K) */}
+          <button
+            type="button"
+            onClick={openCommandPalette}
+            aria-label="Search pages and actions (Ctrl+K)"
+            className={cn(
+              'hidden min-h-9 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground outline-none transition-colors',
+              'hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:flex lg:min-w-56'
+            )}
+          >
+            <Search className="size-4 shrink-0" aria-hidden="true" />
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="kbd pointer-events-none hidden text-[10px] lg:inline-flex">Ctrl K</kbd>
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10 md:hidden"
+            aria-label="Search (Ctrl+K)"
+            onClick={openCommandPalette}
+          >
+            <Search className="size-5" />
+          </Button>
 
           <Button className="h-10 gap-1.5 px-3 sm:px-4" onClick={() => setView('pos')} aria-label="Start a new sale — open POS terminal">
             <Plus className="size-4" aria-hidden="true" />

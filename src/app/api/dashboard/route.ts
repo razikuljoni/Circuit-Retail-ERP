@@ -43,7 +43,7 @@ export async function GET() {
     // ── 14 days of expenses ──
     const expenses = await db.expense.findMany({
       where: { spentAt: { gte: d14Start, lt: tomorrow } },
-      select: { amount: true, spentAt: true },
+      select: { amount: true, spentAt: true, paymentMethod: true },
     })
 
     // ── Today + yesterday aggregates (from the 14-day fetch) ──
@@ -84,13 +84,24 @@ export async function GET() {
 
     let tExpenses = 0
     let yExpenses = 0
+    let todayCashExpenses = 0
     const dailyExpenses = new Map<string, number>()
     for (const e of expenses) {
       const at = e.spentAt.getTime()
-      if (at >= todayStart.getTime() && at < tomorrow.getTime()) tExpenses += e.amount
+      if (at >= todayStart.getTime() && at < tomorrow.getTime()) {
+        tExpenses += e.amount
+        if (e.paymentMethod === 'CASH') todayCashExpenses += e.amount
+      }
       if (at >= yesterdayStart.getTime() && at < todayStart.getTime()) yExpenses += e.amount
       const key = dhakaDateKey(e.spentAt)
       dailyExpenses.set(key, (dailyExpenses.get(key) ?? 0) + e.amount)
+    }
+
+    const cashSales = payMix.get('CASH')?.amount ?? 0
+    const cashDrawer = {
+      cashSales: round2(cashSales),
+      cashExpenses: round2(todayCashExpenses),
+      expectedCash: round2(cashSales - todayCashExpenses),
     }
 
     const today = {
@@ -185,10 +196,27 @@ export async function GET() {
       include: { category: true },
     })
 
+    const since7d = new Date(Date.now() - 7 * 86400000)
+    const velRows = await db.saleItem.groupBy({
+      by: ['productId'],
+      where: { productId: { not: null }, sale: { status: 'COMPLETED', createdAt: { gte: since7d } } },
+      _sum: { qty: true },
+    })
+    const velMap = new Map<string, number>()
+    for (const r of velRows) {
+      if (r.productId) velMap.set(r.productId, r._sum.qty ?? 0)
+    }
+    const velocityOf = (p: { id: string; stock: number }) => {
+      const avgDailyQty = Math.round(((velMap.get(p.id) ?? 0) / 7) * 100) / 100
+      const daysCover = avgDailyQty > 0 ? Math.round((p.stock / avgDailyQty) * 10) / 10 : null
+      return { avgDailyQty, daysCover }
+    }
+
     const lowStock = activeProducts
       .filter((p) => p.stock <= p.reorderLevel)
       .sort((a, b) => a.stock - b.stock)
       .slice(0, 12)
+      .map((p) => ({ ...p, ...velocityOf(p) }))
 
     let vCost = 0, vRetail = 0, outOfStock = 0, lowStockCount = 0
     for (const p of activeProducts) {
@@ -217,6 +245,7 @@ export async function GET() {
       recentExpenses,
       lowStock,
       stockValue,
+      cashDrawer,
     })
   } catch (e) {
     console.error('GET /api/dashboard error:', e)

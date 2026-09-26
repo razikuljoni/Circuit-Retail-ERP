@@ -59,7 +59,25 @@ export async function GET(req: NextRequest) {
     // lowStock filter needs stock <= reorderLevel (column comparison) → filter in JS
     if (lowStock) products = products.filter((p) => p.stock <= p.reorderLevel)
 
-    return NextResponse.json(products)
+    // Sales velocity (last 7 days) → avg daily qty sold + days of stock cover
+    const since7d = new Date(Date.now() - 7 * 86400000)
+    const velRows = await db.saleItem.groupBy({
+      by: ['productId'],
+      where: { productId: { not: null }, sale: { status: 'COMPLETED', createdAt: { gte: since7d } } },
+      _sum: { qty: true },
+    })
+    const velMap = new Map<string, number>()
+    for (const r of velRows) {
+      if (r.productId) velMap.set(r.productId, r._sum.qty ?? 0)
+    }
+    const withVelocity = products.map((p) => {
+      const weekQty = velMap.get(p.id) ?? 0
+      const avgDailyQty = Math.round((weekQty / 7) * 100) / 100
+      const daysCover = avgDailyQty > 0 ? Math.round((p.stock / avgDailyQty) * 10) / 10 : null
+      return { ...p, avgDailyQty, daysCover }
+    })
+
+    return NextResponse.json(withVelocity)
   } catch (e) {
     console.error('GET /api/products error:', e)
     return bad('Failed to load products', 500)

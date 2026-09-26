@@ -13,6 +13,7 @@ import type { DashboardData } from '@/lib/types'
 import { DashboardKpis, QuickActions } from './dashboard/dashboard-kpis'
 import { DailyTrendCard, HourlySalesCard, PaymentMixCard, TopProductsCard } from './dashboard/dashboard-charts'
 import { LowStockCard, RecentExpensesCard, RecentSalesCard } from './dashboard/dashboard-lists'
+import { CashDrawerCard } from './dashboard/cash-drawer-card'
 
 /** '12s' | '3m' human age of the last successful fetch. */
 function agoLabel(fromMs: number, nowMs: number): string {
@@ -70,8 +71,15 @@ export default function DashboardView() {
         actions={
           <>
             {updated && (
-              <span className="hidden text-xs text-muted-foreground sm:inline" aria-live="polite">
-                {updated}
+              <span
+                className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex"
+                aria-live="polite"
+              >
+                <span className="relative flex size-2" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                </span>
+                LIVE · {updated.replace('Updated ', '').replace(' ago', '')}
               </span>
             )}
             <Button
@@ -105,9 +113,10 @@ export default function DashboardView() {
 
           <DailyTrendCard data={data} loading={firstLoad} />
 
-          <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
+          <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
             <TopProductsCard data={data} loading={firstLoad} />
             <LowStockCard data={data} loading={firstLoad} onNavigate={() => setView('inventory')} />
+            <CashDrawerCard data={data} loading={firstLoad} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">

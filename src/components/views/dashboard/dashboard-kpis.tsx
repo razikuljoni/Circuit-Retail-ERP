@@ -68,12 +68,14 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         icon={Banknote}
         trend={salesTrend !== undefined ? { value: salesTrend } : undefined}
         hint={`vs yesterday ${fmtMoney(yesterday.sales, { compact: true })}`}
+        accent="bg-gradient-to-r from-primary/80 to-transparent"
       />
       <StatCard
         title="Transactions"
         value={today.transactions}
         icon={ReceiptText}
         hint={`avg basket ${fmtMoney(today.avgBasket, { compact: true })}`}
+        accent="bg-gradient-to-r from-primary/40 to-transparent"
       />
       <StatCard
         title="Gross Profit"
@@ -82,6 +84,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         trend={profitTrend !== undefined ? { value: profitTrend } : undefined}
         hint={`vs yesterday ${fmtMoney(yesterday.grossProfit, { compact: true })}`}
         iconClassName="bg-emerald-500/10"
+        accent="bg-gradient-to-r from-emerald-500/80 to-transparent"
       />
       <StatCard
         title="Expenses Today"
@@ -89,6 +92,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         icon={Wallet}
         hint={`vs yesterday ${fmtMoney(yesterday.expenses, { compact: true })}`}
         iconClassName="bg-amber-500/10"
+        accent="bg-gradient-to-r from-amber-500/80 to-transparent"
       />
       <StatCard
         title="Net Profit"
@@ -101,6 +105,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         trend={netTrend !== undefined ? { value: netTrend } : undefined}
         hint="gross profit − expenses"
         iconClassName={netPositive ? 'bg-emerald-500/10' : 'bg-red-500/10'}
+        accent={netPositive ? 'bg-gradient-to-r from-emerald-500/80 to-transparent' : 'bg-gradient-to-r from-red-500/80 to-transparent'}
       />
       <StatCard
         title="Stock Value"
@@ -108,6 +113,7 @@ export function DashboardKpis({ data, loading }: { data: DashboardData | null; l
         icon={Boxes}
         hint={`${stockValue.outOfStock} out of stock, ${stockValue.lowStock} low`}
         iconClassName="bg-violet-500/10"
+        accent="bg-gradient-to-r from-violet-500/70 to-transparent"
       />
     </div>
   )

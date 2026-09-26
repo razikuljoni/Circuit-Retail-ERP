@@ -197,3 +197,35 @@ Work Log:
 
 Stage Summary:
 - Automated review/improvement loop is now active — each run reads this worklog, QA-checks the app, fixes bugs and ships incremental features
+
+---
+Task ID: 9 (cron round 2)
+Agent: Z (main)
+Task: QA sweep + 4 new features + styling polish
+
+Work Log — status assessment:
+- Baseline healthy: all 10 views 200, no console errors after reload (prior Fast Refresh warnings were stale from the round-1 fmtMoneyInt bug, already fixed), lint 0 errors
+
+Work Log — new features shipped:
+1. STOCK-COVER METRIC (restock urgency): /api/products + /api/dashboard lowStock now compute 7-day sales velocity (avgDailyQty) and daysCover = stock / avgDaily. New shared badge component src/components/views/inventory/cover-badge.tsx ("≈ 38d left", red ≤3d / amber ≤7d / green / muted 'no recent sales') — surfaced in Inventory Stock-levels rows, Low-stock tab, and Dashboard low-stock list. Types updated in src/lib/types.ts (Product.avgDailyQty/daysCover, CashDrawer).
+2. CASH-DRAWER CARD (dashboard): /api/dashboard now returns cashDrawer {cashSales, cashExpenses, expectedCash} (today's CASH sales − CASH expenses; paymentMethod added to the expense query). New src/components/views/dashboard/cash-drawer-card.tsx in the dashboard 3-col row: expected-drawer callout (emerald/red), explanatory footnote about non-cash settlement.
+3. COMMAND PALETTE (Ctrl/⌘+K): src/components/app/command-palette.tsx — quick actions (new sale, record expense, add product, adjust stock) + all nav targets + tips, cmdk-based. Mounted in page.tsx; header gained a fake-search trigger (lg:min-w-56, kbd hint) + mobile icon button. Browser-verified: Ctrl+K opens, "Go to Sales" navigates (#/sales).
+4. BARCODE LABEL PRINTER: src/components/views/products/barcode39.tsx (pure-SVG Code39 encoder, run-length wide/narrow bars) + label-sheet.tsx dialog (copies 1–60, live 52mm-style preview: name, barcode, SKU, price). Products rows gained a Tags icon button. Print path: body.printing-label + appended @media print CSS block in globals.css (3-col label grid, break-inside avoid).
+5. JSON BACKUP: new GET /api/backup (full snapshot of settings/products/sales/expenses/customers/movements with counts + exportedAt); Settings → Data card gained emerald "Backup" panel with timestamped download (circuit-backup-YYYY-MM-DD-HH-MM.json). Verified: counts {products 43, sales 282, expenses 19, movements 726}.
+
+Work Log — styling polish (mandatory):
+- StatCard: optional top accent gradient bar prop; dashboard KPIs now carry per-metric accents (primary, emerald, amber, violet, dynamic red for negative net)
+- Dashboard header: pulsing green LIVE · Xs chip replaces plain "Updated ago" text (animation + aria-live polite)
+- Verified visually at 1280px: accent bars, LIVE chip, cover badges, label dialog all render in light mode
+
+Verification:
+- bun run lint: 0 errors (1 pre-existing benign RHF warning)
+- All 5 spot-checked endpoints 200; dev.log clean
+- Browser: palette nav works, label dialog renders barcode preview, inventory badges live
+
+Stage Summary:
+- App now has 5 additional production features: restock urgency metric, cash-drawer reconciliation, command palette, barcode label printing, JSON backup
+- No known bugs; remaining risks: Code39 fallback (products with non-alphanumeric SKUs render plain text — acceptable), label print CSS untested on paper (prints-from-browser verified only)
+
+Recommended next phase:
+- Purchase orders (supplier-level restock basket from low-stock list), daily Z-report modal in Sales, customer credit/dues tracking, expense attachments/notes search, PDF report export

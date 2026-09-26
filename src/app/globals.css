@@ -234,3 +234,27 @@
     background: transparent !important;
   }
 }
+
+/* ── Barcode label printing styles (round 2) ── */
+@media print {
+  body.printing-label *:not(.label-print-area):not(.label-print-area *) {
+    display: none !important;
+  }
+  body.printing-label .label-print-area {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    background: #fff !important;
+    padding: 8mm !important;
+  }
+  body.printing-label .label-print-area .label-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 4mm !important;
+  }
+  body.printing-label .label-print-area .label-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -10,6 +10,7 @@ import {
   PackageSearch,
   Pencil,
   Plus,
+  Tags,
 } from 'lucide-react'
 import { api, qs } from '@/lib/api'
 import { fmtMoney, fmtNum, fmtQty } from '@/lib/format'
@@ -29,6 +30,7 @@ import { hashColor } from './products/colors'
 import { downloadProductsCsv } from './products/csv'
 import { useDebouncedValue } from './products/use-debounced-value'
 import { ProductDialog } from './products/product-dialog'
+import { LabelSheet } from './products/label-sheet'
 
 type Quick = 'all' | 'low' | 'out'
 type SortKey = 'name' | 'stock' | 'price'
@@ -86,6 +88,7 @@ export default function ProductsView() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<Product | null>(null)
   const [archivePending, setArchivePending] = useState(false)
+  const [labelTarget, setLabelTarget] = useState<Product | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
 
   function openCreate() {
@@ -364,6 +367,15 @@ export default function ProductsView() {
                               >
                                 <Pencil className="size-3.5" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8"
+                                aria-label={`Print barcode label for ${p.name}`}
+                                onClick={() => setLabelTarget(p)}
+                              >
+                                <Tags className="size-3.5" />
+                              </Button>
                               {p.isActive ? (
                                 <Button
                                   variant="ghost"
@@ -397,6 +409,16 @@ export default function ProductsView() {
             )}
           </Card>
         </>
+      )}
+
+      {labelTarget && (
+        <LabelSheet
+          product={labelTarget}
+          open={labelTarget !== null}
+          onOpenChange={(o) => {
+            if (!o) setLabelTarget(null)
+          }}
+        />
       )}
 
       <ProductDialog

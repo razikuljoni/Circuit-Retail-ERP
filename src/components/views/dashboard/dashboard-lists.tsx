@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/page-bits'
+import { CoverBadge } from '@/components/views/inventory/cover-badge'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import type { DashboardData, Expense, Sale } from '@/lib/types'
 
@@ -107,9 +108,15 @@ export function LowStockCard({
                     </span>
                   </span>
                   {out ? (
-                    <Badge variant="destructive">Out</Badge>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <CoverBadge product={p} />
+                      <Badge variant="destructive">Out</Badge>
+                    </span>
                   ) : (
-                    <Badge variant="secondary">Low: {p.stock}</Badge>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <CoverBadge product={p} />
+                      <Badge variant="secondary">Low: {p.stock}</Badge>
+                    </span>
                   )}
                 </button>
               </li>

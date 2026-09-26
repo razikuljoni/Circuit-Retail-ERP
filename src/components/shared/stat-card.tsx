@@ -14,13 +14,16 @@ interface StatCardProps {
   trend?: { value: number; label?: string } // percent vs previous; +/- shows arrow
   iconClassName?: string
   className?: string
+  /** Optional top accent bar (Tailwind bg classes), e.g. 'bg-emerald-400/70' */
+  accent?: string
 }
 
-export function StatCard({ title, value, icon: Icon, hint, trend, iconClassName, className }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, hint, trend, iconClassName, className, accent }: StatCardProps) {
   const trendUp = (trend?.value ?? 0) > 0
   const trendFlat = Math.abs(trend?.value ?? 0) < 0.05
   return (
-    <Card className={cn('shadow-sm hover:shadow-md transition-shadow', className)}>
+    <Card className={cn('relative overflow-hidden shadow-sm hover:shadow-md transition-shadow', className)}>
+      {accent && <span aria-hidden className={cn('absolute inset-x-0 top-0 h-[3px]', accent)} />}
       <CardContent className="p-3.5 sm:p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
+import { CoverBadge } from '@/components/views/inventory/cover-badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -251,7 +252,10 @@ export default function InventoryView() {
                                     )}
                                   />
                                 </div>
-                                <div className="text-[11px] text-muted-foreground mt-0.5">min {fmtQty(p.reorderLevel)}</div>
+                                <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2">
+                                  <span>min {fmtQty(p.reorderLevel)}</span>
+                                  <CoverBadge product={p} />
+                                </div>
                               </TableCell>
                               <TableCell className="text-right tabular-nums whitespace-nowrap">
                                 {fmtMoney(p.stock * p.costPrice)}
@@ -344,6 +348,7 @@ export default function InventoryView() {
                                     Low
                                   </Badge>
                                 )}
+                                <CoverBadge product={p} className="ml-2" />
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button
