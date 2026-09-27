@@ -1,8 +1,27 @@
 import { PrismaClient } from '@prisma/client'
+import { createClient } from '@libsql/client'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { runSeed } from './seed'
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
-const prismaInstance = globalForPrisma.prisma || new PrismaClient()
+function createPrismaInstance(): PrismaClient {
+  const url = process.env.DATABASE_URL ?? ''
+  const authToken = process.env.TURSO_AUTH_TOKEN ?? process.env.DATABASE_AUTH_TOKEN
+
+  if (url.startsWith('libsql://') || url.startsWith('https://')) {
+    console.log('⚡ Connecting to Turso (libSQL) remote database...')
+    const adapter = new PrismaLibSql({
+      url,
+      authToken: authToken || undefined,
+    })
+    return new PrismaClient({ adapter })
+  }
+
+  return new PrismaClient()
+}
+
+const prismaInstance = globalForPrisma.prisma || createPrismaInstance()
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prismaInstance
 
 let isInitialized = false
@@ -17,7 +36,7 @@ export async function ensureDbInitialized() {
       await prismaInstance.settings.count()
       isInitialized = true
     } catch {
-      console.log('⚡ Fast auto-creating SQLite tables & default settings...')
+      console.log('⚡ Table schema missing — auto-creating database tables & default settings...')
       const tables = [
         `CREATE TABLE IF NOT EXISTS "Category" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL UNIQUE, "description" TEXT, "color" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);`,
         `CREATE TABLE IF NOT EXISTS "Supplier" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "phone" TEXT, "email" TEXT, "address" TEXT, "notes" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);`,
