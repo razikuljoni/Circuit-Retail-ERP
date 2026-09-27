@@ -227,6 +227,27 @@ Stage Summary:
 - App now has 5 additional production features: restock urgency metric, cash-drawer reconciliation, command palette, barcode label printing, JSON backup
 - No known bugs; remaining risks: Code39 fallback (products with non-alphanumeric SKUs render plain text — acceptable), label print CSS untested on paper (prints-from-browser verified only)
 
+---
+Task ID: 10
+Agent: Antigravity (main)
+Task: Production deployment readiness, pnpm & node:sqlite migration, Vercel & Cloudflare deployment, GitHub push
+
+Work Log:
+- Replaced all references to Bun across package.json, documentation, and scripts with pnpm and Node.js.
+- Fixed pnpm db:seed execution failure by installing tsx and updating package.json scripts.
+- Migrated scripts/backup.ts and scripts/restore.ts from bun:sqlite to Node.js 22+ native node:sqlite (DatabaseSync).
+- Created .env.example with documentation for DATABASE_URL, SEED_TOKEN, NEXT_PUBLIC_APP_URL, and PORT.
+- Updated package.json metadata (repository, bugs, homepage) and repository references across README.md, CONTRIBUTING.md, SECURITY.md, and GitHub workflows to point to razikuljoni/Circuit-Retail-ERP.
+- Implemented dual database engine architecture in src/lib/db.ts supporting both local SQLite files and remote Turso libSQL URLs with automatic cold-start schema initialization.
+- Created vercel.json and configured Vercel production deployment at https://circuit-retail-erp.vercel.app.
+- Resolved local port 3000 EADDRINUSE conflict and verified all GET/POST API endpoints returning 200 OK.
+- Pushed clean main branch to GitHub repository git@github.com:razikuljoni/Circuit-Retail-ERP.git.
+
+Stage Summary:
+- Quality Gates Passed: pnpm lint (0 errors), pnpm typecheck (clean), pnpm build (standalone output ready).
+- Production status: Operable locally on http://localhost:3000 and live on Vercel at https://circuit-retail-erp.vercel.app.
+
+
 Recommended next phase:
 - Purchase orders (supplier-level restock basket from low-stock list), daily Z-report modal in Sales, customer credit/dues tracking, expense attachments/notes search, PDF report export
 
