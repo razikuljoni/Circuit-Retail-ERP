@@ -10,9 +10,8 @@
 #   ghcr.io/<owner>/<repo>:1.2     (major.minor, auto-moves on each release)
 #   ghcr.io/<owner>/<repo>:latest  (convenience pointer to newest release)
 #
-# NOTE: this repo has NO Dockerfile committed yet — add one (standalone
-# output: `bun .next/standalone/server.js`, needs DATABASE_URL at runtime)
-# before the first tag push, or the `docker` job will fail.
+# NOTE: this repo has Dockerfile committed (standalone
+# output: `node .next/standalone/server.js`, needs DATABASE_URL at runtime).
 
 name: Release
 
@@ -37,32 +36,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
         with:
-          bun-version: latest
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
 
       # --frozen-lockfile + postinstall `prisma generate` (same rationale as ci.yml).
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: bun run lint
+        run: pnpm run lint
 
       - name: Typecheck
-        run: bun run typecheck
+        run: pnpm run typecheck
 
       # Throwaway SQLite file: proves the checked-in schema is valid and
       # pushable from a clean slate (see ci.yml for the full rationale).
       - name: Sync Prisma schema to throwaway SQLite database
-        run: bun run db:push
+        run: pnpm run db:push
         env:
           DATABASE_URL: file:/tmp/ci.db
 
       # Real type-checking gate: next build type-checks every route
       # (ignoreBuildErrors is NOT set). Blocks the image build on failure.
       - name: Production build (standalone bundle)
-        run: bun run build
+        run: pnpm run build
         env:
           DATABASE_URL: file:/tmp/ci.db
 

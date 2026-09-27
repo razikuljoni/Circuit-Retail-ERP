@@ -2,7 +2,7 @@
 #  Circuit Retail ERP — Docker build-context guard
 #
 #  The build only needs: src/, public/, prisma/, scripts/, package.json,
-#  bun.lock, next.config.ts, tsconfig.json, postcss.config.mjs,
+#  pnpm-lock.yaml, next.config.ts, tsconfig.json, postcss.config.mjs,
 #  tailwind.config.ts, components.json, eslint.config.mjs.
 #  Everything below is deliberately kept OUT of the context so builds stay
 #  small and cache-friendly and never leak secrets or live shop data.

@@ -4,14 +4,14 @@
 # → upload the self-assembled standalone bundle as a downloadable artifact.
 #
 # Why this shape:
-# - `bun run typecheck` (tsc --noEmit) is green project-wide, but the real
+# - `pnpm run typecheck` (tsc --noEmit) is green project-wide, but the real
 #   gate is `next build`, which type-checks every route/page with
 #   ignoreBuildErrors NOT set — a broken import or type error fails the build.
 # - `db:push` against a throwaway SQLite file proves the Prisma schema is
 #   valid and pushable from a clean slate (catches malformed models before
 #   a deploy does).
 # - The uploaded `next-standalone` artifact can be downloaded and run
-#   manually (`bun .next/standalone/server.js`) for smoke-testing a PR
+#   manually (`node .next/standalone/server.js`) for smoke-testing a PR
 #   without Docker.
 
 name: CI
@@ -36,29 +36,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Installs Bun ≥ 1.2 (satisfies the `engines` constraint in package.json)
-      # so bun.lock and all `bun run` scripts behave exactly as locally.
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
         with:
-          bun-version: latest
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
 
       # --frozen-lockfile: CI must build with EXACTLY the versions locked in
-      # bun.lock — no silent dependency drift. The package.json `postinstall`
+      # pnpm-lock.yaml — no silent dependency drift. The package.json `postinstall`
       # hook runs `prisma generate` automatically, producing the typed
       # Prisma client needed by the typecheck and build steps below.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # ESLint over the repo (flat config). Fails on errors; warnings pass.
       - name: Lint
-        run: bun run lint
+        run: pnpm run lint
 
       # Project-wide TypeScript check (tsconfig excludes skills/examples/
       # tests/download/tool-results/agent-ctx, so this is fully green when
       # healthy). Fast feedback before the slower build below.
       - name: Typecheck
-        run: bun run typecheck
+        run: pnpm run typecheck
 
       # Throwaway SQLite database — /tmp/ci.db is ephemeral, never committed.
       # Proves `prisma db push` succeeds from a clean slate (schema is valid,
@@ -67,7 +71,7 @@ jobs:
       # is provided because the Prisma datasource requires DATABASE_URL to be
       # resolvable.
       - name: Sync Prisma schema to throwaway SQLite database
-        run: bun run db:push
+        run: pnpm run db:push
         env:
           DATABASE_URL: file:/tmp/ci.db
 
@@ -77,7 +81,7 @@ jobs:
       # .next/static and public/ into .next/standalone/. A failure here means
       # the release workflow (release.yml) would also fail — stop it early.
       - name: Production build (standalone bundle)
-        run: bun run build
+        run: pnpm run build
         env:
           DATABASE_URL: file:/tmp/ci.db
 

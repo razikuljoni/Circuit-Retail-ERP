@@ -2,9 +2,9 @@
 
 > Production-ready retail operations suite — POS invoicing, inventory & stock ledger, expenses, and a live daily sales dashboard. Built for Dhaka-time (UTC+6) retail.
 
-![CI](https://github.com/<your-username>/circuit-retail-erp/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/razikuljoni/Circuit-Retail-ERP/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![bun](https://img.shields.io/badge/bun-%E2%89%A51.2-f472b6)
+![pnpm](https://img.shields.io/badge/pnpm-%E2%89%A59.0-orange)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![Prisma](https://img.shields.io/badge/Prisma-6-2D3748)
 
@@ -34,25 +34,25 @@ Circuit Retail ERP is a single-tenant, keyboard-friendly retail operations suite
 
 ## Quickstart (development)
 
-Prerequisites: **bun ≥ 1.2** (preferred) or **node ≥ 20**.
+Prerequisites: **node ≥ 20** and **pnpm ≥ 9**.
 
 ```bash
-git clone https://github.com/<your-username>/circuit-retail-erp.git
+git clone https://github.com/razikuljoni/Circuit-Retail-ERP.git
 cd circuit-retail-erp
 
-bun install                 # runs prisma generate automatically (postinstall)
+pnpm install                 # runs prisma generate automatically (postinstall)
 
 cp .env.example .env        # then set DATABASE_URL (see table below)
 
-bun run db:push             # create/sync the SQLite schema
-bun run db:seed             # optional: 42 demo products, 30 days of sales, etc.
+pnpm run db:push             # create/sync the SQLite schema
+pnpm run db:seed             # optional: 42 demo products, 30 days of sales, etc.
 
-bun run dev                 # → http://localhost:3000
+pnpm run dev                 # → http://localhost:3000
 ```
 
 ## Production
 
-Do not run `bun run dev` in production. The recommended path is Docker Compose:
+Do not run `pnpm run dev` in production. The recommended path is Docker Compose:
 
 ```bash
 cp .env.example .env    # set DATABASE_URL=file:/app/db/custom.db and SEED_TOKEN
@@ -74,19 +74,19 @@ Full guide (bare metal, systemd, reverse proxy, backups, monitoring): **[docs/DE
 
 | Script | Purpose |
 | --- | --- |
-| `bun run dev` | Next.js dev server on port 3000 (output tee'd to `dev.log`) |
-| `bun run build` | Production build (standalone output) + copies `static/` and `public/` into the standalone bundle |
-| `bun run start` | Runs the standalone production server (`NODE_ENV=production`, logs to `server.log`) |
-| `bun run lint` | ESLint over the repo |
-| `bun run typecheck` | `tsc --noEmit` (strict TypeScript) |
-| `bun run postinstall` | `prisma generate` (runs automatically after install) |
-| `bun run db:push` | Push `prisma/schema.prisma` to the SQLite database (`--accept-data-loss`; dev tooling) |
-| `bun run db:generate` | Regenerate the Prisma client |
-| `bun run db:migrate` | `prisma migrate dev` |
-| `bun run db:reset` | `prisma migrate reset` |
-| `bun run db:seed` | Seed demo data (`bun scripts/seed.ts`) |
-| `bun run backup` | Consistent SQLite snapshot via `VACUUM INTO` → `backups/circuit-erp-<timestamp>.db` (safe while the app runs) |
-| `bun run restore` | Verify + restore a backup file (archives the current db; **stop the app first**) |
+| `pnpm run dev` | Next.js dev server on port 3000 (output tee'd to `dev.log`) |
+| `pnpm run build` | Production build (standalone output) + copies `static/` and `public/` into the standalone bundle |
+| `pnpm run start` | Runs the standalone production server (`NODE_ENV=production`, logs to `server.log`) |
+| `pnpm run lint` | ESLint over the repo |
+| `pnpm run typecheck` | `tsc --noEmit` (strict TypeScript) |
+| `pnpm run postinstall` | `prisma generate` (runs automatically after install) |
+| `pnpm run db:push` | Push `prisma/schema.prisma` to the SQLite database (`--accept-data-loss`; dev tooling) |
+| `pnpm run db:generate` | Regenerate the Prisma client |
+| `pnpm run db:migrate` | `prisma migrate dev` |
+| `pnpm run db:reset` | `prisma migrate reset` |
+| `pnpm run db:seed` | Seed demo data (`pnpm scripts/seed.ts`) |
+| `pnpm run backup` | Consistent SQLite snapshot via `VACUUM INTO` → `backups/circuit-erp-<timestamp>.db` (safe while the app runs) |
+| `pnpm run restore` | Verify + restore a backup file (archives the current db; **stop the app first**) |
 
 ## API overview
 
@@ -131,7 +131,7 @@ Full guide (bare metal, systemd, reverse proxy, backups, monitoring): **[docs/DE
 ├── backups/                 # VACUUM INTO snapshots (circuit-erp-<timestamp>.db)
 ├── docs/                    # DEPLOYMENT.md, ARCHITECTURE.md, OPERATIONS.md
 ├── .github/                 # CI + Release workflows, dependabot config
-├── Dockerfile               # multi-stage build (bun builder → node:22-slim runner)
+├── Dockerfile               # multi-stage build (node:22-slim builder → node:22-slim runner)
 └── docker-compose.yml       # app service, app-db/app-backups volumes, /api/health healthcheck
 ```
 
@@ -169,7 +169,7 @@ Full guide (bare metal, systemd, reverse proxy, backups, monitoring): **[docs/DE
 
 ## Development notes
 
-- **Quality gates**: `bun run lint` (0 errors) and `bun run typecheck` must pass; `next build` type-checks as well.
+- **Quality gates**: `pnpm run lint` (0 errors) and `pnpm run typecheck` must pass; `next build` type-checks as well.
 - **Views**: the app is a single-route SPA at `/` with 10 hash-synced views — `#/dashboard`, `#/pos`, `#/sales`, `#/products`, `#/inventory`, `#/expenses`, `#/customers`, `#/suppliers`, `#/reports`, `#/settings`. Refresh/back/forward survive because the view is mirrored into the URL hash.
 - **Time & money conventions**: every day window is computed in Dhaka time (UTC+6) via helpers in `src/lib/format.ts` (`startOfTodayUTC`, `dayKeyToUTCStart/End`, …); the server's own timezone is irrelevant. All money is BDT (৳) and rounds to 2 decimals through the shared `round2` helper.
 

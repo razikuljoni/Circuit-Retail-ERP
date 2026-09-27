@@ -29,7 +29,7 @@ Multi-user auth is on the roadmap (see README → Roadmap).
 - **Production security headers** (`next.config.ts`): `Content-Security-Policy` and `X-Frame-Options: SAMEORIGIN` in production; always-on `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy` (camera/microphone/geolocation/payment disabled). `poweredByHeader` is off.
 - **Fail-closed seeding**: in production, `POST /api/seed` is disabled (403) unless `SEED_TOKEN` is set and echoed in the `x-seed-token` header (constant-time comparison). In development it is open for convenience.
 - **Health endpoint** (`GET /api/health`) reports database status for orchestrator checks, so a broken data layer is visible (503 `degraded`).
-- **Backups with integrity checks**: `bun run backup` snapshots via SQLite `VACUUM INTO` and runs `PRAGMA integrity_check`; `bun run restore` verifies before touching anything, archives the current db, and clears WAL sidecars.
+- **Backups with integrity checks**: `pnpm run backup` snapshots via SQLite `VACUUM INTO` and runs `PRAGMA integrity_check`; `pnpm run restore` verifies before touching anything, archives the current db, and clears WAL sidecars.
 - **No secrets in the repo**: `.env` is gitignored; only `.env.example` with placeholders is committed.
 - **Defense in depth in the app**: zod validation on mutating endpoints, transactional sale creation, guarded deletes (referential data blocks deletion), and `robots.txt` disallowing `/api/`.
 
@@ -39,5 +39,5 @@ Multi-user auth is on the roadmap (see README → Roadmap).
 2. **Terminate TLS at a reverse proxy** (Caddy or nginx — see `docs/DEPLOYMENT.md`) and keep the app bound to localhost or the Docker network only.
 3. **Firewall the host** so port 3000 is reachable only from the LAN/trust zone; never port-forward the raw app to the internet.
 4. **If you need auth today**, put an authenticating proxy (e.g. oauth2-proxy, Authelia, Cloudflare Access) in front of the app.
-5. **Back up on a schedule** (hourly `bun run backup` via cron) and copy snapshots offsite.
+5. **Back up on a schedule** (hourly `pnpm run backup` via cron) and copy snapshots offsite.
 6. **Restrict server access** (SSH keys, non-root service user, minimal open ports) and keep Docker/OS patched.

@@ -1,4 +1,3 @@
-/// <reference types="bun-types" />
 /**
  * Circuit Retail ERP — SQLite backup tool.
  *
@@ -6,15 +5,15 @@
  * `VACUUM INTO` (safe to run while the app is serving traffic), then
  * verifies the snapshot with `PRAGMA integrity_check`.
  *
- * Usage:   bun run backup          (or: bun scripts/backup.ts)
+ * Usage:   pnpm run backup          (or: pnpm scripts/backup.ts)
  * Output:  backups/circuit-erp-YYYYMMDD-HHMMSS.db
  *
  * Tip — schedule hourly backups with cron:
- *   0 * * * * cd /path/to/circuit-retail-erp && bun scripts/backup.ts >> backup.log 2>&1
+ *   0 * * * * cd /path/to/circuit-retail-erp && pnpm scripts/backup.ts >> backup.log 2>&1
  */
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { Database } from "bun:sqlite";
+import { DatabaseSync } from "node:sqlite";
 
 function resolveDbPath(): string {
   const raw = process.env.DATABASE_URL;
@@ -58,7 +57,7 @@ function main() {
   // 1) Snapshot. VACUUM INTO only reads the source and writes a fresh,
   //    compacted copy — safe against a live database (busy_timeout guards
   //    against momentary write-lock contention).
-  const src = new Database(dbPath);
+  const src = new DatabaseSync(dbPath);
   try {
     src.exec("PRAGMA busy_timeout = 5000");
     src.exec(`VACUUM INTO '${outPath.replace(/'/g, "''")}'`);
@@ -67,10 +66,10 @@ function main() {
   }
 
   // 2) Verify the snapshot is a valid, intact SQLite database.
-  const check = new Database(outPath, { readonly: true });
-  const row = check.query("PRAGMA integrity_check").get() as {
+  const check = new DatabaseSync(outPath, { readOnly: true });
+  const row = check.prepare("PRAGMA integrity_check").get() as {
     integrity_check: string;
-  } | null;
+  } | undefined;
   check.close();
 
   if (!row || row.integrity_check !== "ok") {
@@ -85,7 +84,7 @@ function main() {
   console.log(`  Size   : ${(size / 1024).toFixed(1)} KB`);
   console.log("  Verify : integrity_check = ok");
   console.log(
-    "\nRestore with: bun run restore backups/" +
+    "\nRestore with: pnpm run restore backups/" +
       outPath.split("/").pop() +
       "   (stop the app first — see docs/OPERATIONS.md)"
   );

@@ -26,8 +26,8 @@ title: '[bug] '
 ## Environment
 
 - **OS:** (e.g. Ubuntu 24.04, macOS 15, Windows 11)
-- **Bun version:** (`bun --version`)
-- **Node version:** (`node --version`, if running under Node)
+- **Node version:** (`node --version`)
+- **pnpm version:** (`pnpm --version`)
 - **Deployment:** Docker or bare metal?
 - **App version:** reported by `GET /api/health` (`version` field) or the release tag
 - **Browser:** (for UI bugs, e.g. Chrome 130, Safari 18)

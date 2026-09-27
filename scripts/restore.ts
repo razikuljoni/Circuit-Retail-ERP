@@ -1,11 +1,10 @@
-/// <reference types="bun-types" />
 /**
  * Circuit Retail ERP — SQLite restore tool.
  *
  * Verifies a backup snapshot, archives the current database file, then
  * copies the snapshot in place.
  *
- * Usage:  bun run restore backups/circuit-erp-YYYYMMDD-HHMMSS.db
+ * Usage:  pnpm run restore backups/circuit-erp-YYYYMMDD-HHMMSS.db
  *
  * IMPORTANT: stop the app first (docker compose stop / pm2 stop / Ctrl-C)
  * so no process holds an open file handle to the database being replaced.
@@ -13,7 +12,7 @@
  */
 import { copyFileSync, existsSync, statSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
-import { Database } from "bun:sqlite";
+import { DatabaseSync } from "node:sqlite";
 
 function resolveDbPath(): string {
   const raw = process.env.DATABASE_URL;
@@ -44,7 +43,7 @@ function timestamp(): string {
 function main() {
   const arg = process.argv[2];
   if (!arg) {
-    console.error("Usage: bun run restore backups/circuit-erp-<timestamp>.db");
+    console.error("Usage: pnpm run restore backups/circuit-erp-<timestamp>.db");
     process.exit(1);
   }
   const src = resolve(arg);
@@ -54,10 +53,10 @@ function main() {
   }
 
   // 1) Verify the backup BEFORE touching anything.
-  const check = new Database(src, { readonly: true });
-  const row = check.query("PRAGMA integrity_check").get() as {
+  const check = new DatabaseSync(src, { readOnly: true });
+  const row = check.prepare("PRAGMA integrity_check").get() as {
     integrity_check: string;
-  } | null;
+  } | undefined;
   check.close();
   if (!row || row.integrity_check !== "ok") {
     console.error(
@@ -86,7 +85,7 @@ function main() {
 
   console.log("✓ Restore complete.");
   console.log(
-    "→ Start the app now (docker compose up -d, or bun run start / dev)."
+    "→ Start the app now (docker compose up -d, or pnpm run start / dev)."
   );
 }
 

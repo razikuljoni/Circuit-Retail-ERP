@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -51,10 +52,14 @@ prompt
 
 server.log
 
-# local SQLite backups created by `bun run backup`
-/backups/
-*.db.bak
-*.db.bak-*
+# Live data & backups — NEVER bake into git / image layer
+db/
+prisma/db/
+backups/
+*.db
+*.db-wal
+*.db-shm
+*.log
 
 # Skills directory
 /skills/

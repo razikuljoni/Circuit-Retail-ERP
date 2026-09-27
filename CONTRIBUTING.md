@@ -7,11 +7,11 @@ Thanks for helping improve Circuit Retail ERP. This guide covers setup, conventi
 Same as the README quickstart:
 
 ```bash
-bun install            # bun ≥ 1.2 preferred (node ≥ 20 works); runs prisma generate
+pnpm install            # node ≥ 20 & pnpm ≥ 9; runs prisma generate
 cp .env.example .env   # set DATABASE_URL (a local file: URL is fine in dev)
-bun run db:push        # sync the SQLite schema
-bun run db:seed        # optional demo data (42 products, 30 days of sales)
-bun run dev            # http://localhost:3000
+pnpm run db:push        # sync the SQLite schema
+pnpm run db:seed        # optional demo data (42 products, 30 days of sales)
+pnpm run dev            # http://localhost:3000
 ```
 
 Restart the dev server after any `prisma generate` or schema push — a stale in-memory Prisma client returns 500s on new fields.
@@ -24,8 +24,8 @@ Restart the dev server after any `prisma generate` or schema push — a stale in
 
 ## Quality gates (must pass before review)
 
-1. **Lint** — `bun run lint` with **0 errors** (pre-existing benign warnings aside).
-2. **Types** — `bun run typecheck` passes (`tsc --noEmit`, strict).
+1. **Lint** — `pnpm run lint` with **0 errors** (pre-existing benign warnings aside).
+2. **Types** — `pnpm run typecheck` passes (`tsc --noEmit`, strict).
 3. **Browser verification** — manually exercise the views your change touches in the running app:
    - both light and dark mode,
    - mobile width (~390px, no horizontal overflow),
@@ -35,12 +35,12 @@ Restart the dev server after any `prisma generate` or schema push — a stale in
 
 ## Pull request checklist
 
-- [ ] `bun run lint` — 0 errors
-- [ ] `bun run typecheck` — passes
+- [ ] `pnpm run lint` — 0 errors
+- [ ] `pnpm run typecheck` — passes
 - [ ] Verified in the browser (light + dark, mobile ~390px)
 - [ ] Print outputs checked if print CSS/markup changed
 - [ ] API changes keep `src/lib/types.ts` accurate (additive changes preferred)
-- [ ] Schema changes pushed with `bun run db:push` and documented
+- [ ] Schema changes pushed with `pnpm run db:push` and documented
 - [ ] Test/QA data cleaned up
 - [ ] Docs updated (README tables, `docs/` pages) when behavior or endpoints change
 
