@@ -2,7 +2,7 @@
 // orchestrator healthchecks and the docker-compose healthcheck.
 // Returns 200 when the app + database are healthy, 503 when degraded.
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, ensureDbInitialized } from "@/lib/db";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function GET() {
   let databaseError: string | undefined;
 
   try {
+    await ensureDbInitialized();
     await db.$queryRaw`SELECT 1`;
     database = "up";
   } catch (e) {

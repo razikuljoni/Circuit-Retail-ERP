@@ -4,7 +4,7 @@
 // (so all "% vs yesterday" comparisons keep working unchanged). Trend/top-products stay
 // relative to today; hourly/payment-mix/cash-drawer follow the selected day.
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureDbInitialized } from '@/lib/db'
 import {
   round2,
   hourLabel,
@@ -25,6 +25,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   try {
+    await ensureDbInitialized()
     // ── Optional ?date= review param (format-valid + real calendar day) ──
     const dateParam = new URL(req.url).searchParams.get('date')
     if (
