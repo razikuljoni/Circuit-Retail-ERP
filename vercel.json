@@ -1,4 +1,4 @@
 {
-  "buildCommand": "pnpm db:push --accept-data-loss && pnpm db:seed && pnpm build",
+  "buildCommand": "pnpm build",
   "framework": "nextjs"
 }
