@@ -1,0 +1,7 @@
+# Issue template chooser configuration.
+#
+# Blank issues stay enabled so reporters are never blocked — e.g. quick
+# questions, data/import problems, or anything that doesn't fit the two
+# structured forms above. No external contact links (chat/forums) are set
+# up for this repository.
+blank_issues_enabled: true

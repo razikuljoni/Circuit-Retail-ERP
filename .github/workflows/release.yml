@@ -1,0 +1,159 @@
+# Release — runs when a version tag (v1.2.3 …) is pushed.
+#
+# Pipeline: quality gates first (identical to CI — a release must pass the
+# same lint/typecheck/schema-sync/build gauntlet), then build & push a
+# multi-tagged Docker image to GitHub Container Registry (ghcr.io), then
+# write a short GitHub Step Summary listing what was published.
+#
+# Tags produced for `v1.2.3`:
+#   ghcr.io/<owner>/<repo>:1.2.3   (semver, patch-precise)
+#   ghcr.io/<owner>/<repo>:1.2     (major.minor, auto-moves on each release)
+#   ghcr.io/<owner>/<repo>:latest  (convenience pointer to newest release)
+#
+# NOTE: this repo has NO Dockerfile committed yet — add one (standalone
+# output: `bun .next/standalone/server.js`, needs DATABASE_URL at runtime)
+# before the first tag push, or the `docker` job will fail.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Workflow-wide least privilege; the `docker` job widens only what it needs.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------- quality
+  # Self-contained copy of the CI quality gate (kept inline deliberately —
+  # no reusable-workflow indirection for a two-file setup). A release never
+  # ships from code that would fail `ci.yml`.
+  quality:
+    name: Lint · Typecheck · Schema · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # --frozen-lockfile + postinstall `prisma generate` (same rationale as ci.yml).
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      # Throwaway SQLite file: proves the checked-in schema is valid and
+      # pushable from a clean slate (see ci.yml for the full rationale).
+      - name: Sync Prisma schema to throwaway SQLite database
+        run: bun run db:push
+        env:
+          DATABASE_URL: file:/tmp/ci.db
+
+      # Real type-checking gate: next build type-checks every route
+      # (ignoreBuildErrors is NOT set). Blocks the image build on failure.
+      - name: Production build (standalone bundle)
+        run: bun run build
+        env:
+          DATABASE_URL: file:/tmp/ci.db
+
+  # ----------------------------------------------------------------- docker
+  # Build & push the container image to GHCR. Auth uses the automatic
+  # GITHUB_TOKEN — no personal tokens or repo secrets to configure.
+  docker:
+    name: Build & push image to GHCR
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # required to push to ghcr.io with GITHUB_TOKEN
+    outputs:
+      # Carried to the `summary` job (step outputs are not visible across jobs).
+      tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Buildx gives GHA layer caching (cache-from/cache-to below), which
+      # keeps release rebuilds fast even though each release is a fresh VM.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Logs in to ghcr.io as the actor that triggered the tag push.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Computes image name + tags from the pushed tag. metadata-action
+      # lowercases ghcr.io/${{ github.repository }} automatically.
+      # Semver patterns extract from `vX.Y.Z` (leading `v` stripped by the
+      # action). `type=raw,value=latest` needs no enable guard here: this
+      # workflow only ever runs on `v*` tag pushes, so "latest" is applied
+      # on exactly the builds that should carry it.
+      - name: Extract image metadata (tags & labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      # context is the repo root (Dockerfile lives there). cache-from/to
+      # type=gha mode=max reuses every intermediate layer between releases.
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------- summary
+  # Small human-readable receipt on the workflow run page.
+  summary:
+    name: Release summary
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write GitHub Step Summary
+        env:
+          # Pass via env (not direct ${{ }} in the script) to avoid shell
+          # injection from tag names.
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          IMAGE_TAGS: ${{ needs.docker.outputs.tags }}
+        run: |
+          {
+            echo "## 🚀 Release \`${RELEASE_TAG}\` — image published"
+            echo ""
+            echo "Quality gates passed (lint · typecheck · schema sync · production build) and the image was pushed to GHCR with the following refs:"
+            echo ""
+            echo '```'
+            echo "${IMAGE_TAGS}"
+            echo '```'
+            echo ""
+            echo "Quick pull:"
+            echo ""
+            echo '```bash'
+            echo "docker pull ghcr.io/${REPO}:latest"
+            echo '```'
+            echo ""
+            echo "> 📝 **Reminder:** attach release notes to the \`${RELEASE_TAG}\` tag —"
+            echo "> GitHub Releases → edit the auto-drafted release for this tag."
+          } >> "$GITHUB_STEP_SUMMARY"

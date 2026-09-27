@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
@@ -15,9 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+  ),
   title: "Circuit Retail ERP",
   description:
     "Retail operations suite for small & medium shops — POS invoicing, inventory & stock ledger, expenses, and a live daily sales dashboard. Built for Dhaka-time retail.",
+  applicationName: "Circuit Retail ERP",
   keywords: [
     "retail ERP",
     "POS",
@@ -26,9 +30,29 @@ export const metadata: Metadata = {
     "sales dashboard",
     "Next.js",
   ],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  openGraph: {
+    type: "website",
+    siteName: "Circuit Retail ERP",
+    title: "Circuit Retail ERP",
+    description:
+      "Retail operations suite — POS invoicing, inventory & stock ledger, expenses, and a live daily sales dashboard.",
   },
+  twitter: {
+    card: "summary",
+    title: "Circuit Retail ERP",
+    description:
+      "Retail operations suite — POS invoicing, inventory & stock ledger, expenses, and a live daily sales dashboard.",
+  },
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
+  ],
 };
 
 export default function RootLayout({

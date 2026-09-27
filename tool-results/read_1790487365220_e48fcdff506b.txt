@@ -1,0 +1,893 @@
+     1→# Worklog — Circuit Retail ERP
+     2→
+     3→---
+     4→Task ID: 0
+     5→Agent: Z (main)
+     6→Task: Reconstruct enhanced plan + initialize worklog
+     7→
+     8→Work Log:
+     9→- Upload file "Retail ERP Plan from Circuit.md" was NOT present in /home/z/my-project/upload (empty dir)
+    10→- Rebuilt a comprehensive production-grade plan from the stated scope (inventory + POS invoicing + expenses + daily sales dashboard) into /home/z/my-project/PLAN.md
+    11→- Defined full Prisma data model, API surface, module list, UX standards, build order (Tasks 1–8)
+    12→
+    13→Stage Summary:
+    14→- Plan file: /home/z/my-project/PLAN.md (source of truth for all agents)
+    15→- Next: Task 1 foundation (schema + seed + libs) → Task 2 APIs → Tasks 3-6 views → Task 7 QA
+    16→
+    17→---
+    18→Task ID: 1
+    19→Agent: Z (main)
+    20→Task: Foundation — Prisma schema, seed data, shared libs
+    21→
+    22→Work Log:
+    23→- Replaced prisma/schema.prisma with full retail model: Category, Supplier, Product, StockMovement (ledger), Customer, Sale, SaleItem (snapshots), ExpenseCategory, Expense, Settings
+    24→- `bun run db:push` — schema synced to db/custom.db
+    25→- Created src/lib/types.ts (shared API types incl. DashboardData, PnlReport, CartItem), src/lib/format.ts (Dhaka TZ helpers, fmtMoney ৳, day-key conversions), src/lib/api.ts (typed fetch client)
+    26→- Created scripts/seed.ts (bun scripts/seed.ts) — fixed barcode unique collision, seeded: 42 products, 7 categories, 5 suppliers, 8 customers, 8 expense categories, 18 expenses, 281 sales over 30 days (673 items), 721 stock movements, 2 refunds, settings (Circuit Electronics & More, BDT ৳)
+    27→- PLAN.md written (full plan). Worklog initialized.
+    28→
+    29→Stage Summary:
+    30→- DB is populated and ready. API contract = src/lib/types.ts. Currency default ৳. All times Asia/Dhaka.
+    31→- Next: Task 2 (API routes) + Task 3 (app shell) in parallel, then views.
+    32→
+    33→---
+    34→Task ID: 3
+    35→Agent: frontend-styling-expert
+    36→Task: App shell — layout, header, sidebar/drawer, footer, view router, placeholders
+    37→
+    38→Work Log:
+    39→- Read PLAN.md, worklog.md, src/lib/format.ts + src/lib/types.ts (read-only) to align types/currency/time helpers
+    40→- Created src/store/ui.ts — zustand store: typed ViewKey union (10 views), setView, sidebarOpen/setSidebarOpen, settings cache (StoreSettings, seeded defaults) with setSettings (syncs setCurrencySymbol) and deduped loadSettings() → GET /api/settings (payload-normalizing, fails soft)
+    41→- Rewrote src/app/layout.tsx — next-themes ThemeProvider (attribute="class", defaultTheme="system", enableSystem, disableTransitionOnChange), sonner Toaster (richColors, top-right, rounded toastOptions), metadata title "Circuit Retail ERP" + description, Geist fonts + body min-h-screen/antialiased/bg-background kept
+    42→- Rewrote src/app/page.tsx — flex-col min-h-screen shell (bg-background): AppHeader (sticky z-40) / flex-1 row: AppSidebar + main#main / AppFooter (mt-auto sticky-bottom); skip-to-content link; React.lazy map for all 10 views + Suspense with branded ViewSkeleton; framer-motion fade/slide (key=view, opacity 0→1, y 8→0); URL hash sync both directions (hashchange listener + location.hash writer, loop-guarded) with scroll-to-top on view change; loadSettings() called once on mount
+    43→- Created src/components/app/nav-list.tsx — MAIN/MANAGE/INSIGHTS sections (10 items, lucide icons), active = bg-primary text-primary-foreground + left indicator bar + aria-current="page", hover:bg-muted inactive, optional badge slot, min-h-10 (40px) touch targets, focus-visible rings
+    44→- Created src/components/app/app-header.tsx — h-14 sm:h-16 border-b bg-background/80 backdrop-blur; mobile Menu (lg:hidden) + brand chip; live Dhaka clock via useSyncExternalStore 30s bucket (fmtDate/fmtTime, e.g. "26 Sep 2026 · 09:54 PM", hydration-safe); "New Sale" primary → setView('pos'); mounted-guarded Sun/Moon theme toggle; notifications Popover fetching GET /api/dashboard once — low-stock list (amber AlertTriangle, name+sku+stock), click → setView('inventory'), graceful failure/zero states
+    45→- Created src/components/app/app-sidebar.tsx — desktop sticky aside (hidden lg:flex, w-60, top-14/16, h-[calc(100vh-3.5/4rem)], border-r) + mobile Sheet side="left" driven by store (closes on navigate); StoreProfileCard bottom (store name from settings + "৳ BDT · Dhaka")
+    46→- Created src/components/app/app-footer.tsx — mt-auto border-t; © year Circuit Retail ERP, outline currency Badge, "Made for retail" + Heart, KeyboardHint (F2/Enter/F9 in .kbd kbd chips, hidden md:block), pb includes env(safe-area-inset-bottom)
+    47→- Created src/components/app/view-skeleton.tsx — branded Suspense fallback (icon + title bar + 3 shimmer cards)
+    48→- Created src/components/views/placeholder.tsx + 10 default-export placeholders (Dashboard/Pos/Sales/Products/Inventory/Expenses/Customers/Suppliers/Reports/Settings) — icon + title + "Coming in next build phase" chip + skeleton shimmer; lazy-importable by the shell and swappable by Tasks 4–6
+    49→- Appended to src/app/globals.css (additive only): thin rounded muted webkit+firefox scrollbars, .kbd class, @media print {.no-print{display:none}} (applied no-print to header/sidebar/footer), reserved .receipt-print
+    50→- QA: bun run lint → 0 problems (fixed 2 react-hooks/set-state-in-effect errors by switching clock + mounted-guard to useSyncExternalStore); dev.log clean for my files (remaining errors are Task 2's api/expense-categories route); agent-browser E2E: hash sync #/pos→#/reports persists across reload, aria-current correct, notifications show 12 live low-stock items from /api/dashboard and click jumps to #/inventory, mobile 390px drawer opens/navigates/closes with no horizontal scroll, dark/light toggle flips html class, footer pushed by long content
+    51→
+    52→Stage Summary:
+    53→- Shell is live on '/' : header + desktop sidebar/mobile drawer + 10-view lazy router + sticky footer + theme + toasts; all UI chrome marked .no-print
+    54→- Placeholder contract: any file at src/components/views/<X>View.tsx with a default export replaces the placeholder automatically (lazy import in page.tsx LAZY_VIEWS map) — no shell changes needed for Tasks 4–6
+    55→- Shared state contract: useUiStore exposes view/setView (hash-synced), sidebarOpen/setSidebarOpen, settings/settingsLoaded/setSettings/loadSettings (currency symbol set globally via '@/lib/format'); nav config + ViewKey exported from src/store/ui.ts and src/components/app/nav-list.tsx
+    56→- Next: Tasks 4–6 replace placeholders (Dashboard, POS/Sales, CRUD views); shell needs no further edits
+    57→
+    58→---
+    59→Task ID: 2
+    60→Agent: full-stack-developer
+    61→Task: Complete backend API layer (all /api/* routes) for retail ERP
+    62→
+    63→Work Log:
+    64→- Created src/lib/api-utils.ts (server helpers): round2 money rounding, bad()/zodMsg() error JSON, isDayKey, numParam, isUniqueError (P2002), dayRangeFromKeys (Dhaka day-key → UTC [start,end)), dayKeysBetween, dayKeyLabel ('26 Sep'), hourLabel ('10 AM'), dhakaHour
+    65→- Settings: GET /api/settings (creates default row if missing), PUT (partial zod: storeName/address/phone/currency/currencyCode/taxRate/receiptFooter/lowStockDays)
+    66→- Products: GET /api/products with search (name/sku/barcode contains), categoryId/supplierId, status=active|inactive|all, includeInactive=1, lowStock=1 (JS filter stock<=reorderLevel since Prisma/SQLite can't compare columns), outOfStock=1, sort=name|stock|price, limit; POST with zod + friendly unique checks + $transaction opening-stock StockMovement('PURCHASE','Opening stock'); GET [id] + last 30 movements; PUT [id] (sku/barcode uniqueness, stock field ignored); DELETE [id] soft-delete isActive=false
+    67→- Categories / Suppliers / Expense-categories: list with _count, POST/PUT, DELETE guarded ('Category has products' / 'Supplier has products' / 'Category has expenses', 400); expense-categories GET adds monthTotal (Dhaka current-month Σ via dayKeyToUTCStart of YYYY-MM-01)
+    68→- Customers: GET list with _count.sales + totalSpent/lastPurchaseAt (sale.groupBy customerId where COMPLETED), search by name/phone; GET [id] + last 20 sales (id/invoiceNo/total/createdAt/status) + lifetime spend; POST/PUT/DELETE (sales survive via SetNull)
+    69→- Sales POST (core POS): zod items/paymentMethod CASH|CARD|MOBILE/orderDiscount/paid/note; duplicate product lines merged for cumulative stock validation; per-line tax from product.taxRate; subtotal/discount(line+order)/tax/total(clamped>=0)/costTotal/profit; paid defaults to total, change=max(0,paid-total); invoice 'INV-YYYYMMDD-####' with per-day sequence counted INSIDE $transaction; nested item create with name/sku/costPrice snapshots; per-item stock decrement + StockMovement('SALE', -qty, before/after, ref invoiceNo); returns full sale+items+customer
+    70→- Sales GET: from/to Dhaka day keys → dayKeyToUTCStart/End, method/status filters, search invoiceNo-or-customer-name, limit/offset; response { sales(+items+customer), total, summary over WHOLE filtered set: count/gross/discounts/refunds/tax/profit (two aggregates split by status) }
+    71→- Sales [id] GET; POST /api/sales/[id]/refund → $transaction: 400 if already REFUNDED, restores stock per item + StockMovement('REFUND', +qty, ref invoiceNo, note 'Refund'), returns updated sale
+    72→- Expenses: GET with from/to/categoryId/method/search/limit/offset → { expenses(+category), total, summary { total, byMethod CASH/CARD/MOBILE/BANK, byCategory [{categoryId,name,amount}] } } over whole set; POST zod (amount>0, spentAt datetime default now); PUT/DELETE [id] hard delete
+    73→- Stock: POST /api/stock/adjust in $transaction (PURCHASE/RETURN delta-in, DAMAGE delta-out with stock guard, ADJUST absolute target with signed movement qty; 400 on negative result incl. 'Insufficient stock for X (available N)'); GET /api/stock/movements newest-first with product {id,name,sku,unit} + productId/type/from/to/limit filters
+    74→- Dashboard GET: exact DashboardData shape — today (sales/transactions/avgBasket guarded/grossProfit/expenses/netProfit/discounts/refunds), yesterday, 24 hourly buckets ('0'..'23' + '10 AM' labels, Dhaka hours), 14 daily rows ascending (date/label/sales/expenses/profit=ΣsaleProfit−expenses), paymentMix (today COMPLETED), topProducts (7d, by qty, top 5), recentSales 8 (+customer+items), recentExpenses 8 (+category), lowStock 12 (active, stock<=reorderLevel, stock asc), stockValue {cost,retail,products,outOfStock,lowStock(0<stock<=reorder)} — one 14-day sales fetch aggregated in JS
+    75→- Reports GET ?type=pnl|products|daily with Dhaka day-key range (defaults last 30d): pnl → PnlReport (revenue/refunds/discounts/tax/cogs/grossProfit/expensesTotal/expensesByCategory+color/netProfit/transactions/avgBasket guarded); products → ProductPerformance[] top 50 by revenue from COMPLETED SaleItems (margin guarded); daily → DailySalesRow[] per Dhaka day (transactions incl. refunded, gross/discounts/refunds/net=gross/cogs/profit/expenses, zero-filled days, 366-day cap)
+    76→- Seed refactor: src/lib/seed.ts exports runSeed() (full logic from scripts/seed.ts using '@/lib/db', no client creation/disconnect); scripts/seed.ts is now a thin wrapper (runSeed → log → process.exit(0), catch → exit(1)) — compile-verified with bun build, NOT executed (data intact); POST /api/seed calls runSeed() → { ok, counts }
+    77→- types.ts: additive only — Customer.totalSpent?/lastPurchaseAt?, ExpenseCategory.monthTotal?, DashboardData hourly label?
+    78→- Fixed during dev: format-helper imports (dayKeyToUTCStart/End/dhakaDateKey come from @/lib/format not api-utils), expenses Promise.all TDZ bug (byCategoryGroup), products status=all incorrectly filtering isActive, stray ZodErrorLike hack in settings removed
+    79→- Verified end-to-end with curl: all 14 endpoints 200; full POS cycle (sale INV-20260926-0004 → stock 3→1 → refund → stock 1→3 → double-refund 400); stock PURCHASE +5 & ADJUST→10 on A4 Paper Rim (left in place); DAMAGE insufficient-stock 400; duplicate SKU 400; guarded deletes 400; 404s for missing ids; /api/seed GET→405 (route compiles; not executed); expenses create/update/delete roundtrip; settings PUT; dashboard matches contract; bun run lint clean; final dev.log check — only expected 2xx/4xx since fixes
+    80→
+    81→Stage Summary:
+    82→- 21 route files + api-utils + seed refactor complete; all JSON matches src/lib/types.ts (additive-only change)
+    83→- Data delta from testing: 1 extra REFUNDED sale (INV-20260926-0004) and 2 stock movements on STA-001 (stock now 10) — acceptable per spec; hard-deleted the temporary TEST-API-1 product so products = 42
+    84→- Frontend can consume: /api/dashboard (DashboardData), /api/sales (list+summary+POST), /api/products (+lowStock/outOfStock/sort), /api/reports?type=pnl|products|daily, /api/expenses, /api/expense-categories (+monthTotal), /api/stock/adjust + movements, /api/customers (+totalSpent), /api/categories, /api/suppliers, /api/settings, /api/seed
+    85→- Next: Tasks 3-6 views can build against these APIs; Task 7 QA
+    86→
+    87→---
+    88→Task ID: 2
+    89→Agent: full-stack-developer
+    90→Task: Build complete backend API layer
+    91→
+    92→Work Log:
+    93→- Created src/lib/api-utils.ts (round2, errors, Dhaka day-key ranges, labels) and src/lib/seed.ts (runSeed extracted); scripts/seed.ts now a thin wrapper; POST /api/seed wired
+    94→- 21 route files: settings, seed, products(+[id]), categories(+[id]), suppliers(+[id]), customers(+[id]), sales(+[id]+[id]/refund), expenses(+[id]), expense-categories(+[id]), stock/adjust, stock/movements, dashboard, reports(pnl|products|daily)
+    95→- POS POST /api/sales transactional: INV-YYYYMMDD-#### numbering, per-item tax, stock check/decrement + SALE movements, cost snapshots; refund restores stock with REFUND movements
+    96→- GET /api/sales returns page + whole-filter summary; dashboard returns exact DashboardData contract; delete guards for categories/suppliers/expense-categories
+    97→- Full curl E2E suite passed; fixed 3 bugs (format import, expenses TDZ, status=all); lint clean
+    98→
+    99→Stage Summary:
+   100→- All 14 GET endpoints verified 200; POS sale→refund cycle verified with stock restoration
+   101→- Data delta: 1 refunded test sale, +5 purchase/adjust on A4 Paper Rim
+   102→
+   103→---
+   104→Task ID: 3
+   105→Agent: frontend-styling-expert (summary of its own entry above)
+   106→Task: App shell built — see full record above (Agent: frontend-styling-expert)
+   107→
+   108→Work Log:
+   109→- zustand ui store, layout with ThemeProvider+Toaster, page.tsx shell with lazy views + hash routing, header/sidebar/footer components, placeholder views
+   110→- Browser-verified by its agent: hash sync, drawer nav, dark mode, low-stock popover, sticky footer
+   111→
+   112→Stage Summary:
+   113→- Contract: drop real components at src/components/views/<X>View.tsx (default export) — shell picks up automatically
+   114→- Shared toolkit added by main agent for view builders: src/hooks/use-api.ts (useApi/useMutation), src/components/shared/{stat-card,page-bits,confirm-dialog}.tsx
+   115→
+   116→---
+   117→Task ID: 6
+   118→Agent: full-stack-developer
+   119→Task: Build six management views — Products, Inventory, Expenses, Customers, Suppliers, Settings
+   120→
+   121→Work Log:
+   122→- Read worklog.md, PLAN.md, then all existing toolkit before coding: use-api.ts, api.ts, format.ts, types.ts, page-bits, stat-card, confirm-dialog, store/ui.ts + verified exact API contracts by reading routes (products, products/[id], stock/adjust, stock/movements, expenses, expense-categories, customers, customers/[id], settings, seed) — e.g. PUT products/[id] accepts isActive (partial) → restore uses {isActive:true}; stock/movements returns array → client-side slice + Load more; customers/[id] returns flat customer with embedded sales[]
+   123→- ProductsView: PageHeader (Export CSV + Add product), 5 compact StatCards (count, Σstock×cost, Σstock×price, low, out — client-side from loaded list), filter toolbar (search debounce 350 → qs url, category/supplier/status selects, ToggleGroup All|Low|Out, sort name|stock|price), table (mono SKU, name+barcode, colored category dot w/ hashColor fallback, price bold + cost muted, tax%, stock red/amber/normal + 'min N', Active/Archived badges, edit / archive-with-ConfirmDialog / restore-for-inactive via PUT isActive)
+   124→- products/product-dialog.tsx: Sheet(right, max-w-xl, scrollable), RHF+zod (string numeric fields → validated, converted at submit; price<cost non-blocking amber hint), unit/category/supplier selects, opening stock on CREATE only (hint; disabled on edit), isActive switch on edit, SKU dup → toast.error(server msg), submit→POST/PUT + toasts + refetch products+categories
+   125→- products/csv.ts (BOM + escaping, sku,name,category,cost,price,stock,reorder), products/colors.ts (hash palette, no blue/indigo), products/use-debounced-value.ts
+   126→- InventoryView: stats computed client-side from /api/products?status=active (cost/retail value, low, out); Tabs: Stock levels (stock bar via Progress colored [>div] emerald/amber/red vs 2×reorder, cost value, per-row Receive(PURCHASE)/Adjust(ADJUST)), Low stock (stock≤reorder incl. out-of-stock badges, 'Receive 10' quick restock → PURCHASE qty 10 note 'Quick restock' + toasts + refetch products+movements), Movement ledger (type/date-from-to defaults last 7d/client product search, type color badges via inventory/movement-type.tsx, signed qty colored with 'before → after', mono reference, limit=200 + client slice 50 + Load more + 'Showing x of y', Export movements CSV)
+   127→- inventory/adjust-dialog.tsx: product Select (500, shows stock), type Tabs Receive/Return/Damage/Set-exact with dynamic qty labels ('Quantity received'/'…returned'/'…damaged'/'New stock count'), current-stock inline for ADJUST, note+reference, POST /api/stock/adjust → success toast shows 'stock N → M'; server 'Insufficient stock…' surfaces via toast.error
+   128→- ExpensesView: Dhaka month scope (Chevron Prev/Next + 'September 2025' label + 'This month' reset; helpers expenses/month-range.ts monthKeyOf/shiftMonth/monthLabel/monthRange), from/to = month bounds on /api/expenses (limit 500, debounced search), StatCards (Month total from summary.total, Today Σ client-side, Largest category), LEFT card day-grouped (desc, Today chip, per-day totals; rows: category color dot + title + category badge + ref/note, amount bold + method badge w/ icon + edit/delete w/ ConfirmDialog), RIGHT By-category (share % bars colored by category.color) + By-method (4 icon rows), Manage → expenses/category-dialog.tsx (list w/ monthTotal, add name+color picker, delete blocked → server msg toast)
+   129→- expenses/expense-dialog.tsx: title/amount/category/method/date(default today; dayKeyToUTCStart + current time-of-day for today, preserved orig time-of-day on edit, noon for other days)/reference/note; POST/PUT → toast + refetch
+   130→- CustomersView: debounced search → /api/customers, card grid (deterministic avatar palette + initials, phone/email, purchases badge, totalSpent bold, last purchase), DropdownMenu Edit/History/Delete, customers/history-dialog.tsx (GET [id] → mini-stats lifetime spend/purchases/last + last 20 sales list invoiceNo mono + status badge + total, spinner + ErrorState), customer dialog (name/phone/email/address/notes), delete → ConfirmDialog → refetch
+   131→- SuppliersView: search, card grid (product-count badge, phone/email/address/notes), Edit/Delete (server 400 'Supplier has products' → toast.error), suppliers/supplier-dialog.tsx
+   132→- SettingsView: settings/profile-form.tsx (keyed remount from GET data; storeName/phone/address/currency symbol+code/taxRate/receiptFooter → PUT → toast.success 'Settings saved' + useUiStore.getState().setSettings(updated) so shell currency/sidebar update instantly — loadSettings() dedupes and would no-op after first load, so setSettings with the PUT response is the correct sync path), settings/data-card.tsx (Reseed demo data destructive-outline w/ ConfirmDialog 'replaces ALL data' → POST /api/seed → toast with counts {products,sales,expenses}), About card (Circuit Retail ERP v1.0, stack badges, Asia/Dhaka UTC+6 note)
+   133→- Verify: bunx tsc --noEmit → 0 errors in my files (fixed 1: export AdjustType); eslint my files → 0 errors (1 benign react-hooks/incompatible-library info on RHF watch()); full-project lint errors exist only in Task 5's sales/receipt.tsx + checkout-dialog.tsx (not mine, untouched); dev.log → clean compiles, GET / 200, no compile errors; headless agent-browser is network-isolated in this sandbox (ERR_CONNECTION_REFUSED even though server 200 via curl) → per task fallback, curl-verified one+ API per view incl. error paths: products(status=all)/categories/suppliers/customers(+[id] sales[])/expenses(from/to)+summary/expense-categories(monthTotal)/stock/movements(product include)/POST stock adjust DAMAGE>stock → 400 'Insufficient stock for A4 Paper Rim (500s) (available 10)' / POST products dup SKU → 400 'SKU "STA-001" already exists'
+   134→- Note: dev server was down on arrival; started in-session for verification (auto-managed instance may supersede)
+   135→
+   136→Stage Summary:
+   137→- All 6 placeholder views replaced (default exports, shell lazy map picks them up with zero shell edits); 12 helper files under products/inventory/expenses/customers/suppliers/settings prefixes; no files outside my scope touched
+   138→- Full CRUD everywhere with pending-spinners, sonner success/error toasts (server messages surfaced), ConfirmDialog before destructive ops, EmptyState/ErrorState/ViewLoader, overflow-x-auto tables, aria-labels on icon buttons, dark-mode-safe colors (no blue/indigo), fmtMoney/fmtQty/fmtDateTime everywhere, Dhaka calendar month scoping in Expenses
+   139→- Next: Task 7 integration QA (note: remaining lint error is in sales/receipt.tsx setMounted effect)
+   140→
+   141→---
+   142→Task ID: 4
+   143→Agent: full-stack-developer (completed work; agent response lost to infra timeout — record written by main agent after verifying artifacts)
+   144→Task: Dashboard (daily sales) + Reports views
+   145→
+   146→Work Log:
+   147→- DashboardView.tsx + dashboard/{dashboard-kpis, dashboard-charts, dashboard-lists}.tsx exist and compile clean
+   148→- ReportsView.tsx + reports/{reports-controls, reports-pnl, reports-tables, reports-utils}.tsx exist and compile clean
+   149→- Verified via dev.log: /api/dashboard polled, /api/reports?type=pnl|products|daily fetched with from/to ranges
+   150→- bun run lint: 0 errors project-wide (1 benign RHF watch warning in products dialog from Task 6)
+   151→
+   152→Stage Summary:
+   153→- Dashboard + Reports views integrated with shell lazy map; charts use recharts + shadcn ChartContainer
+   154→- QA of these two views happens in Task 7 browser pass
+   155→
+   156→---
+   157→Task ID: 5
+   158→Agent: full-stack-developer (completed work; agent response lost to infra timeout — record written by main agent after verifying artifacts)
+   159→Task: POS terminal + Sales/Invoice views
+   160→
+   161→Work Log:
+   162→- PosView.tsx (474 lines), SalesView.tsx (554 lines), src/store/pos.ts, sales/{cart-panel, checkout-dialog, receipt, sale-detail}.tsx all exist and compile clean
+   163→- Verified via dev.log: POST /api/sales 201 (a real sale was made through the UI!), /api/sales?from=&to=&limit=15 fetched, /api/products?limit=500 refetched after sale
+   164→- bun run lint: 0 errors
+   165→
+   166→Stage Summary:
+   167→- POS flow works end-to-end against live API (sale created via UI observed in dev.log)
+   168→- Receipt printing + refund flows to be QA'd in Task 7 browser pass
+   169→
+   170→---
+   171→Task ID: 7
+   172→Agent: Z (main)
+   173→Task: Integration QA — full browser E2E pass + fixes
+   174→
+   175→Work Log:
+   176→- agent-browser sweep of all 10 views at 1280px, 390px mobile, and dark mode — every view renders with live data, no white screens
+   177→- Golden path verified in-browser: POS add-to-cart (2 items) → cash checkout (Exact) → sale INV-20260926-0008 → thermal receipt dialog → toast; Sales table updated live; refund from sale detail → status REFUNDED, stock restored toast, refund button disabled 'Already refunded'
+   178→- Expense created via UI form ('Tea biscuits for meeting' ৳240) — month total and by-category updated live
+   179→- Product created via UI sheet (GEN-101 HDMI Cable 2m Gold, opening stock 40) — stats and table updated live
+   180→- FIX 1: KPI truncation at 1024–1536px (dashboard 6-col & reports 5-col squeezed values like '৳4,67...') → added fmtMoneyInt (whole-taka) to src/lib/format.ts, tightened StatCard (smaller icon/title), dashboard+reports KPI grids now 2xl-only at max density
+   181→- FIX 2: reports-pnl.tsx missing fmtMoneyInt import caused runtime error boundary (fmtMoneyInt is not defined) — caught by browser pass, fixed import
+   182→- FIX 3: seeded 30-day sales drained opening stock (26/42 products out) → seed now uses opening = max(stock*3, reorder*8); re-seeded; now 8 out / 8 low (realistic for alert demos)
+   183→- Mobile POS: 2-col grid, sticky bottom cart bar opens cart sheet with full checkout — verified at 390px
+   184→- Final state: lint 0 errors (1 benign RHF warning), / and /api/dashboard 200
+   185→
+   186→Stage Summary:
+   187→- App is production-grade complete: Dashboard, POS (with receipts/hold/held), Sales (filters/refund/CSV), Products (CRUD/archive/CSV), Inventory (tabs/adjust/ledger/quick-restock), Expenses (month scope/categories/methods), Customers, Suppliers, Reports (P&L/products/daily), Settings (profile/reseed)
+   188→- DB re-seeded with healthy stock; demo data: 42+ products, 282 sales/30 days, 18+ expenses
+   189→
+   190→---
+   191→Task ID: 8
+   192→Agent: Z (main)
+   193→Task: Recurring webDevReview cron
+   194→
+   195→Work Log:
+   196→- Created scheduled job id 416694, kind=webDevReview, fixed_rate 900s (every 15 min), priority 10, with the mandatory task description + project context (points to PLAN.md and this worklog)
+   197→
+   198→Stage Summary:
+   199→- Automated review/improvement loop is now active — each run reads this worklog, QA-checks the app, fixes bugs and ships incremental features
+   200→
+   201→---
+   202→Task ID: 9 (cron round 2)
+   203→Agent: Z (main)
+   204→Task: QA sweep + 4 new features + styling polish
+   205→
+   206→Work Log — status assessment:
+   207→- Baseline healthy: all 10 views 200, no console errors after reload (prior Fast Refresh warnings were stale from the round-1 fmtMoneyInt bug, already fixed), lint 0 errors
+   208→
+   209→Work Log — new features shipped:
+   210→1. STOCK-COVER METRIC (restock urgency): /api/products + /api/dashboard lowStock now compute 7-day sales velocity (avgDailyQty) and daysCover = stock / avgDaily. New shared badge component src/components/views/inventory/cover-badge.tsx ("≈ 38d left", red ≤3d / amber ≤7d / green / muted 'no recent sales') — surfaced in Inventory Stock-levels rows, Low-stock tab, and Dashboard low-stock list. Types updated in src/lib/types.ts (Product.avgDailyQty/daysCover, CashDrawer).
+   211→2. CASH-DRAWER CARD (dashboard): /api/dashboard now returns cashDrawer {cashSales, cashExpenses, expectedCash} (today's CASH sales − CASH expenses; paymentMethod added to the expense query). New src/components/views/dashboard/cash-drawer-card.tsx in the dashboard 3-col row: expected-drawer callout (emerald/red), explanatory footnote about non-cash settlement.
+   212→3. COMMAND PALETTE (Ctrl/⌘+K): src/components/app/command-palette.tsx — quick actions (new sale, record expense, add product, adjust stock) + all nav targets + tips, cmdk-based. Mounted in page.tsx; header gained a fake-search trigger (lg:min-w-56, kbd hint) + mobile icon button. Browser-verified: Ctrl+K opens, "Go to Sales" navigates (#/sales).
+   213→4. BARCODE LABEL PRINTER: src/components/views/products/barcode39.tsx (pure-SVG Code39 encoder, run-length wide/narrow bars) + label-sheet.tsx dialog (copies 1–60, live 52mm-style preview: name, barcode, SKU, price). Products rows gained a Tags icon button. Print path: body.printing-label + appended @media print CSS block in globals.css (3-col label grid, break-inside avoid).
+   214→5. JSON BACKUP: new GET /api/backup (full snapshot of settings/products/sales/expenses/customers/movements with counts + exportedAt); Settings → Data card gained emerald "Backup" panel with timestamped download (circuit-backup-YYYY-MM-DD-HH-MM.json). Verified: counts {products 43, sales 282, expenses 19, movements 726}.
+   215→
+   216→Work Log — styling polish (mandatory):
+   217→- StatCard: optional top accent gradient bar prop; dashboard KPIs now carry per-metric accents (primary, emerald, amber, violet, dynamic red for negative net)
+   218→- Dashboard header: pulsing green LIVE · Xs chip replaces plain "Updated ago" text (animation + aria-live polite)
+   219→- Verified visually at 1280px: accent bars, LIVE chip, cover badges, label dialog all render in light mode
+   220→
+   221→Verification:
+   222→- bun run lint: 0 errors (1 pre-existing benign RHF warning)
+   223→- All 5 spot-checked endpoints 200; dev.log clean
+   224→- Browser: palette nav works, label dialog renders barcode preview, inventory badges live
+   225→
+   226→Stage Summary:
+   227→- App now has 5 additional production features: restock urgency metric, cash-drawer reconciliation, command palette, barcode label printing, JSON backup
+   228→- No known bugs; remaining risks: Code39 fallback (products with non-alphanumeric SKUs render plain text — acceptable), label print CSS untested on paper (prints-from-browser verified only)
+   229→
+   230→Recommended next phase:
+   231→- Purchase orders (supplier-level restock basket from low-stock list), daily Z-report modal in Sales, customer credit/dues tracking, expense attachments/notes search, PDF report export
+   232→
+   233→---
+   234→Task ID: 10 (cron round 3)
+   235→Agent: Z (main)
+   236→Task: Status assessment + agent-browser QA + 3 new features (Z-report, purchase orders, customer dues) + styling polish
+   237→
+   238→Work Log — status assessment:
+   239→- Baseline healthy at start: all 10 views render live data (desktop 1280 / mobile 390 / dark mode), 0 console/page errors, lint 0 errors, /api/dashboard 200
+   240→- False alarm investigated: "Last 14 days" chart looked empty in a screenshot — was captured mid recharts animation; DOM inspection confirmed 28 bar rects with proper heights/fills. No bug.
+   241→- Dev server had to be restarted mid-round (Prisma client cached in memory lacked new PO models); restarted detached via subshell — note for future agents: plain `setsid ... &` dies between tool sessions, use `(setsid cmd &)` double-fork pattern
+   242→
+   243→Work Log — bugs fixed (found during QA/code review):
+   244→1. REAL DATA BUG: POST /api/sales never wrote SaleItem.costPrice (DB default 0) → product-performance report margins overstated for API-created sales. Added costPrice to itemRows + one-off backfill script scripts/backfill-cost.ts (run once: "backfilled 1 of 1")
+   245→2. Latent runtime crash: src/store/pos.ts used toast.warn (doesn't exist in sonner) → would TypeError on stock-limit warnings; replaced with toast.warning (2 sites)
+   246→3. Latent tooltip crash: PaymentMixCard passed ChartConfig object into moneyFormatter expecting string labels → tooltip would render "[object Object]"; fixed with dedicated methodLabels map
+   247→4. Missing TS import: command-palette.tsx used Plus without importing (tsc-only error, lint missed it)
+   248→5. Duplicate `import { toast }` in CustomersView after edit (caught by tsc)
+   249→6. Z-report print clone was visible on screen (Turbopack didn't hot-reload globals.css; browser profile also caches CSS) → made hiding cache-proof with inline display:none; print CSS uses !important so it still prints
+   250→
+   251→Work Log — new features shipped:
+   252→1. Z-REPORT (end-of-day): new GET /api/reports?type=zreport&from=YYYY-MM-DD — per-day register summary (gross/discounts/refunds/tax/COGS/grossProfit/expenses/netProfit/avgBasket/itemsSold, byMethod splits, cash-drawer reconciliation (cash sales − cash expenses = expected cash), 24-hour buckets, top-8 items by qty). New src/components/views/sales/z-report.tsx: date picker + scrollable body (max-h-[55vh] — fixed viewport overflow bug) + print button using body.printing-zreport clone pattern (A4, ink-friendly) + globals.css .zreport-print-area block. Button added to SalesView header.
+   253→2. PURCHASE ORDERS: Prisma models PurchaseOrder/PurchaseOrderItem (poNo PO-YYYYMMDD-#### per Dhaka day, status DRAFT|ORDERED|RECEIVED|CANCELLED, item snapshots name/sku/qty/unitCost); schema pushed via db:push. New API: GET/POST /api/purchase-orders, GET/PUT/DELETE /api/purchase-orders/[id] (PUT uses nested items create/deleteMany; delete only DRAFT/CANCELLED), POST /api/purchase-orders/[id]/receive (transactional per-item stock increment + StockMovement('PURCHASE', ref poNo, note 'PO received') + optional per-line qty/cost overrides; updates product costPrice when provided). UI: 4th Inventory tab "Purchase orders" (inventory/purchase-orders.tsx): list table with status badges + per-row actions (Mark ordered / Receive / Cancel / Delete w/ ConfirmDialog); builder dialog with supplier select, product search picker, "Fill from low stock" (suggested qty = max(reorder×2 − stock, 10), editable qty/cost rows, running total, note, Save draft vs Place order). Browser-verified full lifecycle: create draft (10 items ৳5,01,700) → receive → stock value ৳4.2L→৳9.2L, low-stock 10→0, movements ledger shows PO refs.
+   254→3. CUSTOMER CREDIT/DUES: Sale.due computed server-side (total − paid, clamped) and decorated on all sale responses; POST /api/sales rejects partial payment without customerId (exact in-transaction check + early rough check; friendly 400). GET /api/customers adds totalDue per customer; GET /api/customers/[id] adds paid/due per sale + totalDue. New POST /api/sales/[id]/settle {amount} (caps at outstanding, appends payment note) and POST /api/customers/[id]/settle-all (transactional, settles all outstanding). UI: checkout dialog now allows partial payment when a customer is selected (amber "Due on account" panel, confirm button shows "· ৳X due", blocked-with-hint panel when no customer); receipt shows "DUE (CREDIT)" instead of Change; sale detail shows Due (credit) row + "Settle ৳X" button; sales table CREDIT badge; customer cards DUE badge + "Settle dues" dropdown action; history dialog outstanding-due stat + per-invoice due badge + Settle buttons. Browser-verified: POS partial sale (560 total, 300 paid, 260 due) → CREDIT badge → settle from detail → all cleared.
+   255→
+   256→Work Log — styling polish (mandatory):
+   257→- StatCard: hint no longer truncates mid-word (wraps, whitespace-normal leading-snug) — fixes "at or below reorder le…" clipping on Inventory; new trendDownIsGood prop so rising expenses show a red arrow (green previously), Expenses Today KPI now has a % trend like the other KPIs
+   258→- Expenses "By category" bars: thicker (h-2.5), inner-shadow track, ring around color dot, bold label + explicit share % label, 500ms width transition
+   259→- SalesView header: Z-Report + Export CSV grouped in a flex row
+   260→
+   261→Verification:
+   262→- bun run lint: 0 errors (1 pre-existing benign RHF watch warning); bunx tsc --noEmit: 0 errors in src/ (remaining hits are pre-existing examples/skills dirs, not app code)
+   263→- API curl suite: zreport (today + validations), PO create/receive/list, credit-sale guard 400 without customer, partial sale due=50, settle partial (due 50→20), settle-all (1 invoice settled) — all verified
+   264→- Browser E2E: Z-report modal (desktop, scroll fixed), PO tab lifecycle, POS credit checkout, CREDIT/DUE badges, settle from detail — all green on light theme; mobile dashboard + POS spot-checked
+   265→- Dev data delta: 2 POs (1 smoke-test received, 1 demo received ×10), 2 sales (1 settled credit sale INV-20260927-0001, all dues now 0) — clean demo state
+   266→
+   267→Stage Summary:
+   268→- App now covers the full retail loop including purchasing and receivables: POS (cash/card/mobile + credit) → invoices/refunds → stock ledger → purchase orders → suppliers; expenses; dashboard + Z-report + P&L
+   269→- New backend surface: /api/purchase-orders (+[id], +[id]/receive), /api/sales/[id]/settle, /api/customers/[id]/settle-all, /api/reports?type=zreport; customers/sales responses extended with totalDue/due
+   270→- Known limitations: PO receive uses PO quantities (per-line overrides only via API body); settle uses "amount: MAX_SAFE_INTEGER" from UI for full settlement (server caps — partial UI settle possible via API); Z-report print layout is A4-oriented (thermal receipt style remains for invoices)
+   271→
+   272→Recommended next phase:
+   273→- Supplier-level PO grouping UX (one PO per supplier from a single click on dashboard low-stock strip), PO PDF/receipt print, customer credit LIMITS + aging report, expense attachments, PDF/Excel report export, bulk product import CSV parser, multi-user/auth pass
+   274→
+   275→---
+   276→Task ID: 11 (cron round 4)
+   277→Agent: Z (main)
+   278→Task: Status assessment + agent-browser QA + 3 new features (bulk CSV import, credit limits + aging, one-click draft POs) + styling polish
+   279→
+   280→Work Log — status assessment:
+   281→- Baseline healthy: all 10 views render live data, 0 console errors (agent-browser sweep desktop + mobile), lint 0 errors, all API 200; POS golden path re-verified in-browser (cart build → totals → Charge enabled)
+   282→- App had evolved past worklog round 3 with POs/Z-report/cash-drawer already live (documented); dev server was stale-cached after schema push → restarted via (setsid bun run dev &) double-fork
+   283→
+   284→Work Log — bugs found & fixed:
+   285→1. REAL BUG (pre-existing): GET /api/products?lowStock=1 pre-filtered SQL to stock<=0, so "low but positive" products never matched and the JS refinement (stock<=reorderLevel) was dead code for them. Products view "Low" toggle + anything using lowStock=1 silently missed low-stock-but-positive items. Fixed: no SQL stock pre-filter when lowStock=1, full scan then JS filter, limit applied after; outOfStock keeps SQL filter. Verified: returns both demo low items (13/15, 6/8)
+   286→
+   287→Work Log — new features shipped:
+   288→1. BULK PRODUCT IMPORT: new POST /api/products/import (up to 500 rows, zod-validated per row with per-row errors, in-file duplicate SKU/barcode detection, cost>price rejection, category match-or-autocreate by name, supplier match by name, SKU collision modes skip|update, transactional with IMPORT StockMovement rows, auto SKU generation when missing). New products/import-csv.ts (dependency-free CSV parser: quotes/escaped quotes, CRLF, delimiter sniffing comma/tab/semicolon, header aliases name/product, cost/costprice/buy, reorder/min/…, 500-row cap) + products/import-dialog.tsx (paste-or-file tabs with drag&drop, live preview table with money formatting, parse warnings list, template download, skip|update radio, result panel with created/updated/skipped/rejected + first errors, disabled after success). Browser-verified: paste 3 rows → preview → import → toast "2 created, 1 skipped" (STA-001 skipped) → products list updated. NOTE: API rows use API field names (costPrice/price/stock/reorderLevel) — raw curl with CSV column names coerces undefined→NaN error (expected zod behavior, dialog maps fields correctly)
+   289→2. CUSTOMER CREDIT LIMITS + AGING: Customer.creditLimit Float? (schema pushed, dev server restarted for fresh client). POST/PUT /api/customers accept nullable creditLimit (zod coerce nullable+optional verified: null stays null, not 0). POST /api/sales enforces inside transaction: newDue + outstanding(COMPLETED, paid<total) > creditLimit → friendly 400 naming limit/due/available. GET /api/customers passes creditLimit through (auto). New GET /api/customers/aging → per-customer outstanding bucketed by invoice age (≤30 / 31–60 / 61–90 / 90+, Dhaka days), totals + oldest-days, sorted desc. UI: customer dialog creditLimit field (empty = no limit); customer cards show LIMIT ৳X LEFT badge (green/red at cap) + limit badge always; Customers header "Aging" button with ৳1.8k dues badge → AgingDialog (sticky-header table, bucket columns color-graded amber→red, EmptyState when clean); checkout-dialog takes customers prop → live "Credit remaining" panel (emerald when fits, red blocked + confirm disabled when over); PosView passes customers through. Curl-verified: over-limit sale 400 with exact message; within-limit 201 due=1780; aging shows Farhana 1780/limit 2000. Browser-verified both dialog states (red blocked ৳290 due vs green ৳90 due) via LED Bulb + Farhana
+   290→3. ONE-CLICK DRAFT POs FROM DASHBOARD: new POST /api/purchase-orders/bulk-draft {productIds} → re-validates low stock server-side, skips no-supplier/recovered products, groups by supplier, suggested qty = max(2×reorder − stock, 10), creates one DRAFT PO per supplier (per-day poNo sequence inside transaction) with note "Auto-drafted from dashboard low-stock alerts". Dashboard LowStockCard: "Draft POs" button → ConfirmDialog (destructive=false, explains grouping + qty rule) → POST → toast with per-PO summary (poNo · supplier · items · est. total) → auto-navigates to Inventory. Browser-verified: 2 low items → 2 supplier drafts created (est. ৳9,605) → landed on Inventory with toast. ListCard gained footerExtra slot for the action button
+   291→
+   292→Work Log — styling polish (mandatory):
+   293→- PageHeader icon chip: gradient (from-primary/20 via-primary/10 to-primary/5) + inset ring + shadow — applies to all 10 views
+   294→- POS product cards: hover lift (-translate-y-0.5 + shadow-md + border-primary/40) with active press settle; price tracking-tight
+   295→- Customer + supplier cards: same hover-lift treatment (transition-all, consistent 150ms)
+   296→- Draft-POs confirm uses primary (non-destructive) styling
+   297→
+   298→Verification:
+   299→- bun run lint: 0 errors (1 pre-existing benign RHF watch warning); bunx tsc --noEmit: 0 errors in src/
+   300→- agent-browser: import dialog flow, aging dialog (light + dark), Draft POs flow, POS credit guard both states, full 10-view sweep → 0 console errors; mobile 390px customers shows DUE + LIMIT badges cleanly
+   301→- dev.log clean (all 200/201, no compile errors)
+   302→
+   303→Stage Summary:
+   304→- Data delta (intentional demo state): Farhana Akter creditLimit=2000 with ৳1,780 due (INV-20260927-0002, demos DUE/LIMIT badges + aging); 2 DRAFT POs PO-20260927-0004/0005 (demos the dashboard flow); products MS-201 Gaming Mouse + KB-330 Mechanical Keyboard imported via the real UI; Ballpoint Pen Pack stock 13/15 and Bluetooth Speaker 6/8 low (QA-DEMO damage movements) — all realistic demo data, kept on purpose
+   305→- New backend surface: /api/products/import, /api/customers/aging, /api/purchase-orders/bulk-draft; Customer.creditLimit column; sales POST credit-limit enforcement
+   306→- No known bugs; lint/tsc/browser clean
+   307→
+   308→Recommended next phase:
+   309→- PDF/Excel report export (P&L, aging, inventory valuation), supplier-level "Suggest POs" inside Inventory low-stock tab reusing bulk-draft, expense recurring templates, multi-user/auth pass, product images, barcode-scanner keyboard wedge tuning in POS
+   310→
+   311→---
+   312→Task ID: 12 (cron round 5)
+   313→Agent: Z (main)
+   314→Task: Status assessment + agent-browser QA + 3 new features (stocktake, expense templates, P&L print) + scanner-wedge POS + real bug fix (doc-number collisions) + styling polish
+   315→
+   316→Work Log — status assessment:
+   317→- Baseline healthy at start: all 10 views render live data (desktop 1280/1600 + mobile 390, light/dark), 0 console errors, lint 0 errors (1 benign RHF warning), tsc clean in src/, all API 200; POS golden path re-verified (add-to-cart → totals → Charge enabled)
+   318→- Dev server restarted mid-round after schema push (fresh Prisma client) via (setsid bun run dev &) double-fork
+   319→
+   320→Work Log — bugs found & fixed:
+   321→1. REAL BUG (pre-existing, caught by browser E2E): document numbers used count-based sequencing (`count(prefix) + 1`), so once a PO was deleted during the day the next bulk-draft/PO create hit `Unique constraint failed on poNo` (500). Fixed with gap-safe max+1 sequencing: new `maxSeqOf`/`nextDocNumber` helpers in src/lib/api-utils.ts; applied to POST /api/purchase-orders (nextPoNo), POST /api/purchase-orders/bulk-draft (inside tx), and POST /api/sales invoiceNo (defensive — invoices aren't deleted but same pattern). Verified: after deleting smoke POs 0004/0005, new POs correctly number 0006/0007
+   322→2. Minor mobile styling: DUE/LIMIT badges on customer cards could crowd the kebab menu at 390px → badges now wrap in a flex-wrap row with pr-7, verified no overlap
+   323→
+   324→Work Log — new features shipped:
+   325→1. STOCKTAKE (physical inventory count): new POST /api/stock/stocktake (zod-validated up to 500 rows, transactional per-product ADJUST movements with reference STOCKTAKE, skips unchanged rows, returns per-item before/after/delta + varianceValue at cost). New inventory/stocktake-dialog.tsx: search, per-row counted input (placeholder = system stock), live variance badges (+green/−red), "Changed only" filter, running "N rows will be corrected (±৳X at cost)" summary with reset, note field, result panel after apply. Entry: Inventory header "Stocktake" button. Browser-verified full flow: counted STA-001 36→37 (+1, +৳400 variance) → toast + result panel → ledger shows ADJUST ref STOCKTAKE → reverted 37→36 the same way
+   326→2. RECURRING EXPENSE TEMPLATES: new Prisma model ExpenseTemplate (title/category/amount/method/frequency DAILY|WEEKLY|MONTHLY/lastPostedAt/active), schema pushed + server restarted. New API: GET/POST /api/expense-templates, PUT/DELETE /api/expense-templates/[id], POST /api/expense-templates/[id]/post (transactional: creates today's Expense with reference TPL:<title> + stamps lastPostedAt). New expenses/templates-dialog.tsx: list with category dot, frequency badge, method, last-posted, amount; inline create/edit form; per-row Post-today / Edit / Delete (ConfirmDialog). Entry: Expenses header "Templates" button. Browser-verified: post → toast "Expense posted — Shop rent ৳12,000" → "last posted 27 Sep 2026"; posted expense then deleted + lastPostedAt reset to keep demo numbers clean (template kept as demo data)
+   327→3. P&L PRINT / PDF: new reports/pnl-print.tsx — Print button in the P&L breakdown card header; hidden .report-print-area clone (store header, range, waterfall table, summary, expenses by category, net margin) rendered at component root; on Print body tagged `printing-report`, globals.css A4 print block isolates the clone (ink-friendly, table borders, tabular-nums right-aligned). Same proven pattern as Z-report. Browser-verified class tagging + cleanup (window.print stubbed)
+   328→4. POS SCANNER WEDGE TUNING: Enter handler now (a) supports quantity prefix `3*SKU` / `3xBARCODE` (adds N units in one scan, clamped to stock), (b) prefers exact barcode then exact SKU match (case-insensitive) over substring matches, (c) shows "No product matches X" toast instead of silent no-op; query preserved after failed match for easy correction; pos store addItem(product, qty?) extended; search input gained title hint. Browser-verified: 3*STA-001 → 3 × A4 Paper (৳1,680 total), sta-002 exact match adds pen, ZZZ-NOPE → error toast
+   329→
+   330→Work Log — styling polish (mandatory):
+   331→- KPI COUNT-UP: new hooks/use-count-up.ts (rAF ease-out tween, prefers-reduced-motion respected, cascading-render-safe); StatCard gained animatedValue {value, format} + valueClassName props; all 6 dashboard KPIs now glide on load/refresh (Sales/Transactions/Gross/Expenses/Net/Stock Value), Net Profit keeps emerald/red tone via valueClassName
+   332→- Products table: new Margin column (xl+ breakpoints) with colored margin badges (≥25% emerald, 10–25% amber, <10% red, tooltip shows cost→price) — margin quality visible at a glance; min-w bumped to 960px
+   333→- Templates dialog footnote reflow (icon top-aligned, nowrap code chip) after spotting cramped wrap in screenshot
+   334→- ConfirmDialog: optional leading icon in a soft primary chip (used by Draft-POs confirm)
+   335→- Inventory low-stock tab: amber-tinted attention banner with count + "Draft POs for all" action
+   336→
+   337→Verification:
+   338→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   339→- agent-browser: full 10-view sweep 0 console errors (1280 + 1600 + 390px); stocktake/PO-draft/templates/post flows all green; print trigger verified with stubbed window.print
+   340→- API curl suite: expense-templates CRUD + post, stocktake (adjust + revert), bulk-draft gap-safe numbering — all verified; recent dev.log entries all 200
+   341→- Demo data delta: 2 DRAFT POs PO-20260927-0006/0007 (from low-stock flow), 1 template "Shop rent — Uttara branch" (৳12,000/mo, never posted), 3 STOCKTAKE ADJUST movements in ledger (net zero), STA-002/ELC-003 still low for badge demos
+   342→
+   343→Stage Summary:
+   344→- Backend surface added: /api/stock/stocktake, /api/expense-templates (+[id], +[id]/post); ExpenseTemplate model; gap-safe doc numbering helper (maxSeqOf/nextDocNumber) fixes unique-violation class of bugs
+   345→- Frontend: Stocktake dialog, Templates dialog, P&L print, scanner-wedge POS entry, KPI count-up, Products margin column, DUE badge mobile fix
+   346→- Known limitations: stocktake UI page size capped at 200 search results (API takes 500); templates are manual-post only (no scheduler by design — posting is an explicit cashier action); P&L print layout is A4 (receipt printer stays for invoices)
+   347→
+   348→Recommended next phase:
+   349→- Inventory valuation print + aging report print (same report-print-area pattern), supplier statement view (PO history per supplier), stocktake session persistence (save in-progress counts), expense attachments, product images, multi-user/auth pass, cashier shift (X-report) tracking
+   350→
+   351→---
+   352→Task ID: 13 (cron round 6)
+   353→Agent: Z (main)
+   354→Task: Status assessment + agent-browser QA + new features (supplier statement, valuation print, aging print, stocktake draft persistence) + styling polish
+   355→
+   356→Work Log — status assessment:
+   357→- Baseline healthy: all 10 views render with 0 console errors (desktop + mobile 390px), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/ (errors only in non-app examples/skills folders), dev.log all 200s
+   358→- POS golden path re-verified live: add-to-cart → Charge enabled with correct total (A4 Paper ৳910)
+   359→- Decision: no bugs found → proceeded with new-feature development per plan backlog
+   360→
+   361→Work Log — new features shipped:
+   362→1. SUPPLIER STATEMENT: new GET /api/suppliers/[id]/statement (read-only additive) — supplied-product portfolio (count/units/stock value at cost & retail/low-stock/top-12 by value), PO stats (total/draft/ordered/received/cancelled counts + draftValue/openValue/receivedValue + last order & last received dates), last 200 POs with item/qty/cost rollups. New SupplierStatement type family in src/lib/types.ts. New suppliers/statement-dialog.tsx: 4 accent-striped stat tiles, status badge row (received value/awaiting/drafts/low stock/margin %), PO history table (sticky header, status badges), top-products chips, "Print statement" button → A4 report-print-area clone (portfolio table + PO table with received/open/total-value footer). Entry: new FileText icon button on every supplier card (between edit & delete). Browser-verified with Dhaka Wholesale Mart (2 draft POs ৳2,210 open value) + API curl for Anwar Trade International (0 POs path)
+   363→2. STOCK VALUATION PRINT: new inventory/valuation-print.tsx — "Valuation" button in Inventory header (hidden when no products). A4 clone: totals (units, value at cost/retail, potential margin %, low/out counts) + full per-product table sorted by value at cost desc (SKU/name/category/stock+unit/cost/price/value) with totals row. Same printing-report body-tag pattern. Browser-verified clone content activates with correct store header
+   364→3. AGING REPORT PRINT: aging-dialog.tsx extended — "Print aging report" button (left-aligned in footer, only when rows exist) + A4 clone with per-customer bucket rows (phone inline), bucket totals row + grand total due. Return converted to fragment to host clone outside Dialog. Browser-verified clone content
+   365→4. STOCKTAKE DRAFT PERSISTENCE: stocktake-dialog.tsx now auto-saves in-progress counts to localStorage (circuit.stocktake.draft.v1, debounced 600ms, rows+note+savedAt, try/catch best-effort). On open: draft restored + toast "Resumed stocktake draft — N counts saved <time>"; dashed indicator bar shows "Draft auto-saved at <time> · N counts kept if you close or reload" with Discard draft button; Reset counts and successful apply both clear the draft; stale product ids in draft are harmless (never match). Browser-verified: count 34 → close → reopen → value restored + indicator shown → Discard cleared
+   366→
+   367→Work Log — styling polish (mandatory):
+   368→- Supplier statement stat tiles: 2.5px top accent stripes (primary/sky/emerald/amber per metric)
+   369→- Aging dialog: bucket column headers now color-coded (amber 31–60, orange 61–90, red 90+) matching body cells; Total-due badge gains shadow
+   370→- Supplier cards: hover:border-primary/30 ring added to existing hover-lift
+   371→- Statement dialog: removed nonexistent styled-scrollbar class (global thin-scrollbar CSS already applies)
+   372→
+   373→Verification:
+   374→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   375→- agent-browser: 10-view sweep (dashboard/pos/sales/products/inventory/expenses/customers/suppliers/reports/settings) 0 console errors; mobile 390px suppliers shows statement/edit/delete icons cleanly; POS golden path green; print clones verified for valuation + aging + statement; stocktake draft save/resume/discard verified
+   376→- dev.log: all 200s, no compile errors
+   377→- No data mutations this round (all features read-only except stocktake draft which was discarded)
+   378→
+   379→Stage Summary:
+   380→- Backend surface added: GET /api/suppliers/[id]/statement; types: SupplierStatement/SupplierStatementOrder
+   381→- Frontend: statement-dialog.tsx, valuation-print.tsx; aging-dialog + stocktake-dialog extended; SuppliersView statement button
+   382→- All four P&L/valuation/aging/statement reports now print to ink-friendly A4/PDF via one shared CSS pattern
+   383→- Known limitations: statement lists last 200 POs (fine for demo scale); valuation print is A4 (not receipt printer); stocktake draft is per-browser (localStorage), not multi-device
+   384→
+   385→Recommended next phase:
+   386→- X-report (cashier shift close) from Sales view; PO receive with per-line partial quantities; supplier statement email/export; product images; multi-user/auth pass; dashboard auto-refresh indicator polish
+   387→
+   388→---
+   389→Task ID: 14 (cron round 7)
+   390→Agent: Z (main)
+   391→Task: Status assessment + agent-browser QA + new features (X-Report shift snapshot, PO per-line partial receive, dashboard live countdown w/ pause, POS product thumbnails + stock bars) + styling polish
+   392→
+   393→Work Log — status assessment:
+   394→- Baseline healthy at start: all 10 views render with 0 console errors (desktop 1280 + mobile 390), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s
+   395→- POS golden path re-verified live (add-to-cart → ৳560 total). Decision: no bugs found → new-feature development from plan backlog
+   396→
+   397→Work Log — new features shipped:
+   398→1. X-REPORT (SHIFT SNAPSHOT): backend GET /api/reports?type=xreport&from=YYYY-MM-DD&fromTime=HH:MM — zReport engine refactored to accept fromTimeMin (window start = day start + minutes); response gains kind:'X'|'Z', fromTime, label "27 Sep · from 09:00"; validation rejects bad HH:MM (400). Frontend sales/x-report.tsx: sky-accented dialog with shift presets (Morning 09:00 / Evening 17:00 / Last 8 hours), date + time inputs, reuses exported ZReportBody (kind-aware titles: "Sales this shift", print header "X-Report · Shift Snapshot"), same printing-zreport print CSS + clone. Entry: sky "X-Report" button in Sales header (left of Z-Report). Browser-verified: 09:00 → ৳0 (sales were 00:20–01:20 AM), custom 00:15 → ৳6,380 (correctly excludes the earlier ৳560 sale); print trigger verified with stubbed window.print; Z-report unchanged (kind Z)
+   399→2. PO PER-LINE PARTIAL RECEIVE: Prisma PurchaseOrderItem.receivedQty Float @default(0) pushed; receive route rewritten — body {lines:[{productId, qty, unitCost?}]} where qty = THIS delivery, up-front validation (no over-receive, no negative, nothing-to-receive guard), per-line receivedQty increment + PURCHASE movements + cost update, status recomputed: all→RECEIVED / some→PARTIAL / none→unchanged; PUT route now blocks item edits on PARTIAL POs. New inventory/receive-dialog.tsx: per-line Ordered/Received/Now columns, clamped receiving inputs, unit-cost override, per-line delivery progress bars (amber in-progress → emerald done), Fill remaining / Clear buttons, live "This delivery (at cost)" total, Receive all vs Receive delivery button label. PO table: new Received column (% + n/n + progress bar), cyan PARTIAL badge, "Receive rest" button label, min-w 960. Browser-verified full cycle on PO-20260927-0006: receive 4/10 → toast + 40% amber bar + PARTIAL → receive rest 6 → RECEIVED 10/10; ledger shows both movements (4: 6→10, 6: 10→16)
+   400→   - REAL BUG (caught by own E2E, fixed): reopening the receive dialog kept stale qtyNow because prop-driven open doesn't fire Dialog onOpenChange → initFrom moved to a useEffect on [open, po]; verified NOW defaults to remaining (6) on reopen
+   401→3. DASHBOARD LIVE COUNTDOWN + PAUSE: DashboardView now drives refresh via its own 60s countdown (exact sync — fires refetch at 0, resets on completion) instead of useApi pollMs; header shows LIVE pill with SVG countdown ring (stroke-dashoffset animated, emerald), pause/resume toggle (amber dot + "LIVE PAUSED" when paused), manual refresh keeps ring reset. Browser-verified countdown ticking (59s), pause → LIVE PAUSED → resume → LIVE
+   402→4. POS PRODUCT THUMBNAILS + STOCK BARS: new ProductThumb (deterministic hashColor gradient tile, 135° fade, product initials, ring) on every POS product card + new StockBar (stock vs 3× reorder level: emerald healthy / amber low / red out at 100% width) at card bottom; card layout reworked (thumb left, name+sku right, price+badge, bar). Cart line items get matching mini CartThumb keyed off SKU for cohesion. Browser-verified desktop + mobile 390 (2-col grid, thumbnails + amber low bar visible), cart shows AP/CB thumbs matching grid
+   403→
+   404→Work Log — styling polish (mandatory):
+   405→- X-Report button sky-tinted outline (border-sky-500/40 + hover fill) distinguishing it from Z-Report
+   406→- Receive dialog: emerald chip icon in title, sticky table header with backdrop-blur, muted/60 summary strip, clamped inputs with aria labels
+   407→- PO table Received column color-logic (emerald ≥100%, amber >0, muted 0) + title tooltips
+   408→- POS cards: min-h tightened to 5.75rem, gap rhythm 1.5, thumbnails ring-1 ring-black/5 for dark-mode depth
+   409→- Dashboard ring: -rotate-90 SVG with ease-linear transition — reads as a clock draining toward refresh
+   410→
+   411→Verification:
+   412→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   413→- agent-browser: 10-view sweep 0 console errors (desktop + mobile); X-report data/print verified; partial receive full cycle verified incl. reopen-defaults bug fix; dashboard pause/resume verified; POS add-to-cart with new cards verified (৳650 2-item cart) then cart cleared
+   414→- API curl suite: xreport happy path + 400 validation + kind/label/fromTime fields; purchase-orders list shows receivedQty persisted
+   415→- dev.log: all 200s/400-as-designed, no compile errors
+   416→- Demo data delta: PO-20260927-0006 now RECEIVED (receivedQty 10/10), Bluetooth Speaker X15 stock 6→16 (no longer low; STA-002 pen remains low for badge demos), 2 new PURCHASE movements in ledger — realistic completed-PO demo state
+   417→
+   418→Stage Summary:
+   419→- Backend surface added: xreport type in /api/reports (fromTime param, kind/fromTime fields); receive route rewritten for per-line partial deliveries with receivedQty tracking; PurchaseOrderItem.receivedQty column; PUT route PARTIAL edit guard
+   420→- Frontend: x-report.tsx, receive-dialog.tsx; z-report.tsx exports ZReportBody (kind-aware); SalesView X-Report button; purchase-orders.tsx Received column + dialog wiring; DashboardView countdown/pause; PosView + cart-panel thumbnails/bars
+   421→- Known limitations: X-report covers a single Dhaka day only (overnight shifts spanning midnight need two X-reports); "Last 8 hours" preset clamps to today's window (post-midnight use shows only today's slice); partial receive UI assumes one open delivery per line at a time
+   422→- Schema note: receivedQty defaults 0 — existing RECEIVED POs (0001, PO-20260926-0001) show 0% received bars; cosmetic only (status RECEIVED renders emerald regardless)
+   423→
+   424→Recommended next phase:
+   425→- Receipt/receive-note printing for partial deliveries (GRN print), supplier statement to include receivedQty line progress, stocktake session persistence server-side, product images upload, multi-user/auth pass, cashier shift (X-report auto-open on POS login) tracking
+   426→
+   427→---
+   428→Task ID: 15 (cron round 8)
+   429→Agent: Z (main)
+   430→Task: Status assessment + agent-browser QA + new features (GRN print, product image URLs with shared avatar component, supplier statement delivery progress) + demo product photos
+   431→
+   432→Work Log — status assessment:
+   433→- Baseline healthy: 10-view sweep 0 console errors (desktop 1280 + mobile 390 spot checks), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s; POS golden path verified (add → ৳560)
+   434→- Decision: no bugs → feature development from worklog backlog (GRN print, supplier statement progress, product images)
+   435→
+   436→Work Log — new features shipped:
+   437→1. GRN (GOODS RECEIVED NOTE) PRINT: new inventory/grn-print.tsx — per-PO A4 receiving document via the shared .report-print-area pattern (body.printing-report). Content: store header, "Goods Received Note (GRN)", PO no + status, supplier + PO date + delivery state (None yet / Partial / Complete + last received date), per-line table (Product/SKU/Ordered/Received/Remaining with amber-when-open or green-when-done tone/Unit cost/Received value), totals row, order vs received value footer, "Received by / Checked by" signature lines, Dhaka timestamp. Entry: printer icon button on PO rows with status ORDERED/PARTIAL/RECEIVED (DRAFT/CANCELLED excluded). Browser-verified: clone for PO-20260927-0006 contains PO no, Totals, signature lines, delivery state; window.print trigger verified (stubbed)
+   438→2. PRODUCT IMAGE URLS + SHARED AVATAR: Prisma Product.imageUrl String? pushed (nullable, additive). New API validation: zod imageUrl in POST/PUT products (http(s) URL or data:image URI, 300KB cap, ''→null) + isValidImageUrl helper in api-utils; PUT flows through via ...data spread. New shared component components/shared/product-avatar.tsx: renders photo when present, onError falls back to deterministic gradient initials tile (same hashColor), size/text via props. Wired into: POS product cards (replaces local ProductThumb), POS cart line items (CartItem gained imageUrl, pos store addItem copies it), products table name cell (new 32px mini avatar beside name), product dialog (new "Product image URL" field with 56px live preview that switches initials→photo as you type). API verified: PUT with 1-3KB data URIs persists and GETs back (3 products carrying images)
+   439→3. SUPPLIER STATEMENT DELIVERY PROGRESS: statement API now returns receivedQty per PO (items include receivedQty) + poStats.partial count. Type SupplierStatementOrder.receivedQty + poStats.partial added. Dialog: "Qty" column → "Delivery" column with DeliveryProgress component (received/ordered units + color-logic mini progress bar, cyan partial badge in status row); print clone column now "Delivered" as "n/m units". Browser-verified with Fresh Foods Supply Co: PO-0006 100% emerald 10/10, PO-0004 DRAFT 0% 0/10
+   440→4. DEMO PRODUCT PHOTOS: generated 3 studio-style product photos via z-ai CLI (A4 paper ream / chocolate bar / white cube speaker, 1024px) → saved to download/product-img/, downscaled with ffmpeg to 128px JPEGs (0.9-2.3KB), attached as data URIs to STA-001, SNK-005, ELC-003 via PUT /api/products/:id. POS grid + products table now show real photos mixed with initials tiles — demonstrates both states
+   441→
+   442→Work Log — bug fixed (self-inflicted, caught immediately):
+   443→- A failed MultiEdit batch on purchase-orders.tsx partially applied, stripping size/className/aria-label off the PO Delete button (accessibility regression). Restored the full button attributes; verified 10-view sweep + a11y labels intact
+   444→
+   445→Work Log — styling polish (mandatory):
+   446→- GRN document: slate print palette, amber/green remaining-qty tones, signature rules — reads like a real warehouse form
+   447→- Products table: avatar + name cluster with 8px gap keeps row rhythm; barcode stays secondary line
+   448→- Statement: cyan partial badge joins the emerald/amber status row family
+   449→- Product dialog: image preview tile gets border+bg so data-URI photos with white backgrounds sit correctly in dark mode
+   450→
+   451→Verification:
+   452→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   453→- agent-browser: full 10-view sweep 0 console errors + mobile spot checks (pos/products/suppliers) 0; GRN clone content verified; statement progress verified; product dialog preview verified; POS golden path with photo tiles verified
+   454→- API curl: imageUrl PUT persisted for 3 SKUs; products GET returns imageUrl
+   455→- dev.log: all 200s, no compile errors
+   456→- Demo data delta: 3 products with embedded 128px JPEG data-URI photos (STA-001, SNK-005, ELC-003); download/product-img/ holds source PNGs + JPGs
+   457→
+   458→Stage Summary:
+   459→- Backend: Product.imageUrl column + validation in both product routes; statement API returns receivedQty + partial stats; isValidImageUrl helper
+   460→- Frontend: grn-print.tsx, product-avatar.tsx (shared), product dialog image field + preview, POS/cart/products-table avatar wiring, statement DeliveryProgress
+   461→- Known limitations: images are URL/data-URI only (no file-upload storage in sandbox); ProductAvatar <img> uses plain src (remote hosts need CORS-free access; data URIs always safe); GRN assumes cumulative state (not per-delivery history — ledger holds that)
+   462→- Schema note: Product.imageUrl nullable, default null — zero migration risk for existing rows
+   463→
+   464→Recommended next phase:
+   465→- Server-side image upload endpoint (multipart → db/local storage) to replace URL pasting, product image in sale receipt + product performance report, GRN per-delivery history (ledger-based), stocktake session persistence, multi-user/auth pass, barcode scanner wedge tuning follow-up
+   466→---
+   467→Task ID: 5-c
+   468→Agent: full-stack-developer
+   469→Task: Expense receipt attachments (API + dialog field + row thumbnails + viewer)
+   470→
+   471→Work Log:
+   472→- BACKEND POST /api/expenses: added `attachment` to postSchema — z.string().trim().max(450_000).refine(u === '' || isValidImageUrl(u), 'Attachment must be an http(s) or data:image URL').optional().nullable() (exact mirror of the Product.imageUrl pattern from products/[id] route); persisted via `attachment: body.attachment || null` ('' → null) in db.expense.create
+   473→- BACKEND PUT /api/expenses/[id]: same attachment zod field in putSchema; normalize `attachment: body.attachment === undefined ? undefined : body.attachment || null` after the ...body spread (undefined = untouched, '' → null = clear, mirrors categoryId line); imported isValidImageUrl in both routes
+   474→- expense-templates/[id]/post route reviewed — creates Expenses without attachment (defaults null); intentionally left alone
+   475→- NEW COMPONENT expenses/attachment-thumb.tsx: renders nothing when no attachment; otherwise a size-10 rounded-md overflow-hidden border button with 40px object-cover <img> (aria-label "View receipt for <title>", title tooltip) opening a minimal sm:max-w-2xl Dialog — image max-h-[70vh] w-full object-contain, DialogTitle "<title> · ৳amount", sr-only DialogDescription, onError fallback inside viewer ("Receipt image could not be loaded" + ImageOff); broken thumb keeps the button with an ImageOff glyph so the viewer can still explain; broken-src tracking stores the failed src and compares to current attachment (no setState-in-effect — lint rule react-hooks/set-state-in-effect caught my first effect-based reset, rewritten to the derived-comparison pattern)
+   476→- expense-dialog.tsx: "Receipt attachment" field added after Note (full width): 56px preview tile — plain <img> object-cover rounded-md border when value present and loadable, onError swaps to ImageOff tile + muted "Invalid image URL" text; empty state is a dashed-border 56px tile with ImagePlus icon; font-mono text-xs input (placeholder "https://… or data:image…"), ghost "Remove" button (X icon, hover-destructive) clears the field and is hidden while empty; wired into the existing useState flow (dialog has no react-hook-form): attachment state seeded from expense.attachment ?? '' on open, '' when adding; light client-side shape check mirrors server regex; payload always sends `attachment: trimmed || null` — sending null (not omitting) is what makes edit→Remove→save actually clear an existing attachment server-side, and is identical to the dialog's reference/note handling
+   477→- ExpensesView.tsx: <AttachmentThumb expense={e} /> rendered in each grouped day-list row between the main content and the amount/actions cluster (shrink-0 + self-center — vertically centered, truncating content absorbs the 40px so 390px mobile stays overflow-free)
+   478→
+   479→Verification:
+   480→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   481→- curl suite: POST with tiny 1x1 PNG data URI → 201 attachment persisted (118 chars); GET returns it; PUT attachment:"" → 200 null (cleared); PUT "ftp://x" → 400 "attachment: Attachment must be an http(s) or data:image URL"; PUT "https://example.com/receipt.png" → 200 persisted; DELETE → 200 (test expense removed); expense-templates post route untouched
+   482→- agent-browser (isolated session): #/expenses at 1280px — edit "Tea biscuits for meeting" → paste data URI → 56px preview rendered + loaded + Remove visible → Save → toast + row gains "View receipt for Tea biscuits for meeting" thumb → click → viewer Dialog "Tea biscuits for meeting · ৳240.00" with loaded image + sr-only description → Escape; 390px mobile: thumb 40×40, no horizontal overflow, row intact; then edit → Remove (field cleared, empty tile, Remove hidden) → Save → thumb gone from row AND attachment null via API; browser errors clean (console only HMR/Fast-Refresh logs); screenshots: /tmp/qa-expense-dialog-preview.png, /tmp/qa-expense-viewer-open.png, /tmp/qa-expense-attachment.png (row thumb, 1280px), /tmp/qa-expense-attachment-mobile.png (390px)
+   483→- dev.log: expense calls all 200/201/400-as-designed (one transient 500 burst at 20:15 during a concurrent server recompile window — pre-change code path also affected, self-resolved; direct on-disk Prisma client test confirmed create+attachment fine)
+   484→- Demo data delta: net zero — my QA expense deleted; "Tea biscuits for meeting" restored to original state (attachment cleared); also removed one orphaned "QA attachment test" record (cmuiu426x…) with an example.com attachment that a concurrent run of this same task left behind at 20:20:49
+   485→
+   486→Stage Summary:
+   487→- Expenses now support receipt attachments end-to-end: POST/PUT validate (http(s)/data:image, 450KB cap, '' → null) and persist the nullable attachment; GETs return it as a scalar
+   488→- Frontend: new attachment-thumb.tsx (row thumbnail + full-screen-width viewer dialog); expense dialog gained a live-preview receipt URL field with Remove; every expense row shows a 40px clickable thumb only when an attachment exists
+   489→- Files: src/app/api/expenses/route.ts, src/app/api/expenses/[id]/route.ts, src/components/views/expenses/attachment-thumb.tsx (new), src/components/views/expenses/expense-dialog.tsx, src/components/views/ExpensesView.tsx — no other files touched
+   490→- Known limitations: attachment is URL/data-URI only (no file upload in sandbox); broken remote URLs degrade to ImageOff glyph + viewer fallback message; templates posting expenses carry no attachment by design
+   491→- Note: dialog payload sends attachment: null when empty rather than omitting the key — required so edit→Remove→save clears an existing attachment (verified server-side null via GET)
+   492→---
+   493→Task ID: 5-b
+   494→Agent: full-stack-developer
+   495→Task: Dashboard date navigator (API date param + header date picker)
+   496→
+   497→Work Log:
+   498→- API /api/dashboard: optional ?date=YYYY-MM-DD (Dhaka day-key). Validation: isDayKey format check + round-trip guard (dhakaDateKey(dayKeyToUTCStart(date)) === date) so impossible dates like 2026-02-30 also 400 `Invalid date — expected YYYY-MM-DD`; missing param keeps exact legacy behavior
+   499→- Refactored bounds: selStart/selEnd = today's window (startOfTodayUTC..tomorrow) when no param, else dayKeyToUTCStart/dayKeyToUTCEnd(viewDate); prevStart/prevEnd = previous Dhaka day of the selection → `today` block = selected day, `yesterday` block = its previous day (all "% vs yesterday" deltas keep working unchanged); hourly/payment-mix/cash-drawer follow the selected day; daily trend (14d ascending) + topProducts (7d) stay anchored to TODAY; recent sales/expenses lists remain global latest
+   500→- Fetch window extended: windowStart = min(d14Start, prevStart), windowEnd = max(tomorrow, selEnd) so the selected + previous day are always covered — bonus: days OLDER than the 14-day trend resolve correctly too (2026-09-13 returns its real pre-trend sales ৳62,791 instead of zeros)
+   501→- Response gains viewDate (selected day-key) + isToday; typed fields already present in DashboardData (not edited per constraint)
+   502→- DashboardView: viewDate state (null = live) → useApi URL built with qs(); date input (h-9 w-[150px], max = today's Dhaka key, hydration-safe todayKey via useEffect); Today/Yesterday quick chips (size sm h-9, active = default variant, active Yesterday needs yesterdayKey from todayKey); picking today's own key normalizes back to live; historical mode: amber info chip (CalendarClock, "Viewing <date> — live refresh off", role=status), LIVE pill + countdown hidden, pause button disabled with explanatory aria-label, subtitle "Sales for <fmtDate> (historical view)" instead of live clock; countdown intervals + auto-fire gated by paused||isHistorical so returning to today auto-resumes; manual refresh works in both modes
+   503→- Label correctness (driven by data.isToday/data.viewDate from the API — no prop changes): KPI titles "Today Sales/Expenses Today" → "Sales/Expenses (<viewed date>)" when historical; charts "Sales by hour (…)" + empty state "No sales on <date>", "Payment mix (…)" + "No payments that day"
+   504→- DATE-LABEL NOTE: task spec suggested fmtDate(dayKeyToUTCEnd(date)) but dayKeyToUTCEnd is the exclusive end (= next Dhaka day 00:00, per dayRangeFromKeys comment) so it prints the NEXT day; used fmtDate(viewDate) (UTC midnight parse → correct viewed day) everywhere instead
+   505→- Mobile fix (pre-existing, in owned files): the dashboard grids had no base grid-cols-N, so below sm/lg the implicit auto track used min-width:auto and the recharts SVG (fixed attr width) forced 524px horizontal overflow at 390px; added grid-cols-1 to KPI/hourly/payment/trend-row/recent grids in DashboardView + both KPI skeleton/data grids → verified scrollWidth 390 = viewport, chart measures 316px
+   506→- QA sessions raced with concurrent agents driving the same shared browser (hash jumped to #/products twice mid-check) — re-navigated and re-verified each time
+   507→
+   508→Stage Summary:
+   509→- Dashboard now reviews any past Dhaka day: /api/dashboard?date=YYYY-MM-DD (400 on bad key) + header date picker with Today/Yesterday chips; historical views clearly badged (amber chip + subtitle), auto-refresh correctly off, all charts/KPIs follow the selected day while trend/top-products stay today-anchored; empty days render graceful zeros + empty states
+   510→- Files: src/app/api/dashboard/route.ts (date param + window extension + viewDate/isToday), src/components/views/DashboardView.tsx (navigator + historical gating), dashboard-kpis.tsx + dashboard-charts.tsx (viewed-day labels only), mobile grid-cols-1 hygiene
+   511→- Verification: curl suite — no-param identical to legacy (today ৳6,940/3tx, yesterday ৳52,595), ?date=2026-09-24 → ৳1,11,527/13tx/gross ৳31,172/exp ৳380/net ৳30,792 (exactly matches daily[] 2026-09-24), yesterday block = Sep 23 (৳139,615/260), explicit today key ≡ no-param, not-a-date + 2026-02-30 → 400, far-past 2020-01-01 → clean zeros; agent-browser — live default (LIVE + countdown ticking, clock subtitle), past date via input (amber chip, KPIs ৳1,11,527 cross-checked vs curl, countdown hidden, pause disabled, chart titles re-dated), Today chip → live resumes, Yesterday chip → ৳52,595/540, empty day 2025-01-01 → zeros + "No sales/No payments" empty states, mobile 390px no overflow with chip in viewport; screenshots /tmp/qa-dashboard-date.png + /tmp/qa-dashboard-date-mobile.png; bun run lint 0 errors (1 pre-existing benign RHF warning), bunx tsc --noEmit 0 errors in src/, dev.log all dashboard calls 200 (400s only deliberate invalid-param tests)
+   512→- Known cosmetic limitation: CashDrawerCard title still reads "(today)" while its numbers follow the selected day (cash-drawer-card.tsx off-limits per task constraints); date input max blocks future dates at the picker (typed future dates allowed by API → graceful zeros)
+   513→
+   514→---
+   515→Task ID: 5-a
+   516→Agent: full-stack-developer
+   517→Task: Product detail drawer (API + Sheet UI + products table wiring)
+   518→
+   519→Work Log:
+   520→- Read worklog conventions + relevant sources first: ProductDetail/ProductSaleEntry/ProductDetailStats types (types.ts untouched), api-utils (round2/bad), format helpers, GET /api/products (velocity pattern), /api/stock/movements (ledger shape), suppliers/[id]/statement ([id] route pattern), sheet.tsx, ProductAvatar, MovementBadge (inventory/movement-type.tsx), useApi hook
+   521→- BACKEND: new GET /api/products/[id]/detail (force-dynamic, Promise-params ctx): loads product with category+supplier, 404 via bad('Product not found', 404); three parallel Prisma queries — (a) COMPLETED SaleItem rows in last 30d (qty/total/tax/costPrice/saleId + sale.createdAt) aggregated in JS: unitsSold30d=Σqty, revenue30d=Σtotal, profit30d=Σ(total−tax−cost·qty), orders30d=distinct saleIds, avgDailyQty7d=(Σqty where sale.createdAt≥7d ago)/7 round2, daysCover=round1(stock/avg) or null, stockCostValue/stockRetailValue round2, marginPct=round1((price−cost)/price·100) or null; (b) last 12 SaleItem rows in 30d ordered by relation {sale:{createdAt:'desc'}} (SaleItem has no own timestamp) with invoiceNo/paymentMethod/status/customer name → ProductSaleEntry shape incl. lineProfit=round2(total−tax−cost·qty), REFUNDED sales included for the badge; (c) last 15 StockMovement rows desc. Product payload mirrors the list API incl. avgDailyQty/daysCover so onEdit receives a full Product
+   522→- Curl-verified: STA-001 (44 units, ৳24,161 revenue, ৳4,801 profit, 24 orders, margin 28.6%, cover 27.9, 12 sales, 15 movements), ELC-007 Android TV Box (category Electronics + supplier phone present, 35u/৳160,955/৳48,955), nonexistent id → 404 {"error":"Product not found"}; all keys present, movement before/after chains correct
+   523→- FRONTEND: new products/product-detail-drawer.tsx — shadcn Sheet side="right" w-full sm:max-w-xl, controlled by productId!==null; useApi on /api/products/{id}/detail (null url when closed); sr-only SheetTitle/SheetDescription for Radix a11y; pulsing Skeleton layout mirror while loading (also on product switch, prevents stale flash) + centered error state with Retry
+   524→- Header: ProductAvatar size-14, name text-lg font-semibold, SKU·barcode mono muted, category chip with color dot (hashColor fallback), Active/Archived badge, stock-state badge (In stock emerald / Low amber / Out red, same ≤reorder/≤0 tone logic as the table) + "N unit on hand · reorder at M" muted line
+   525→- Stats: 2×3 bg-muted/50 rounded-lg p-3 tiles — Units sold 30d, Revenue 30d, Profit 30d (emerald, red when negative), Stock value (cost), Margin % (≥25 emerald / ≥10 amber / else red, "—" when null), Days of cover (null → "—" muted; amber "Restock soon" hint when ≤7; else "≈ X/day" velocity hint)
+   526→- Sections (text-xs uppercase tracking-wide muted headers + row counts): Recent sales — max-h-64 scrollable rows, mono invoiceNo, customer/Walk-in + Dhaka fmtDate+fmtTime, right side qty × unitPrice and line total tabular-nums, REFUNDED rows get red badge + opacity-60, empty state "No sales in the last 30 days"; Stock movements — reuses shared MovementBadge, signed qty (+emerald/−red w-12 right column), before→after mono, reference chip, relative time (local relTime helper, title=full Dhaka datetime), empty state text
+   527→- Footer: border-t p-5 pt-3 — supplier name+phone muted line (when present), "Edit product" + "Print label" (Tags icon) outline buttons flex-1, rendered only when callbacks provided and product loaded, aria-labels on both
+   528→- WIRE-UP: ProductsView gained detailId state; product-name cell is now a semantic <button type="button"> (flex avatar+name cluster, text-left, hover:text-primary transition-colors, focus-visible ring, aria-label "View details for {name}") setting detailId; row-level Edit/label/archive buttons untouched; <ProductDetailDrawer> rendered next to other dialogs with onEdit → close+openEdit(p) and onPrintLabel → close+setLabelTarget(p)
+   529→- ENV NOTE: dev server was found DOWN (port 3000 dead, no process) mid-round after API-only curl checks — no healthy server was touched; restarted it detached via documented double-fork convention (setsid bun run dev >> dev.log 2>&1 &). Transient browser hash flips to #/dashboard during E2E were traced to Fast Refresh full-reloads while the fresh server settled (console showed "[Fast Refresh] rebuilding"; hash-change logger confirmed reload artifact, idle-page monitoring showed zero self-navigations) — not an app bug
+   530→
+   531→Verification:
+   532→- bun run lint: 0 errors (1 pre-existing benign RHF watch warning); bunx tsc --noEmit: 0 errors in src/ (only pre-existing non-app skills/ errors remain)
+   533→- agent-browser E2E: #/products → click "View details for A4 Paper Rim (500s)" → drawer shows exact API numbers (44 / ৳24,161 / ৳4,801 / ৳14,400 / 28.6% / 27.9 ≈ 1.29/day), 12 sale rows incl. red REFUNDED badge on INV-20260916-0008, 15 movement rows with badges/chips/relative dates; Android TV Box shows Electronics chip + "Supplier: Anwar Trade International · +880 1772-777773" footer; Blender & Juicer shows amber "Restock soon" (cover 4.1)
+   534→- Actions: Edit product closes drawer and opens the product dialog ("Edit product"); Print label closes drawer and opens "Print barcode labels" dialog; Escape closes cleanly, hash stays #/products; keyboard: name button focusable + Enter opens drawer; agent-browser errors: clean
+   535→- Mobile 390px: drawer renders full-width (390px), documentElement.scrollWidth == viewport (no overflow); screenshots: /tmp/qa-product-detail.png (desktop, VLM-verified layout) + /tmp/qa-product-detail-mobile.png
+   536→- dev.log: GET /api/products/{id}/detail all 200 (404 for bogus id as designed), no compile errors
+   537→
+   538→Stage Summary:
+   539→- New backend surface: GET /api/products/[id]/detail (ProductDetail payload: product+category+supplier, 30d stats, last 12 sale lines, last 15 movements) — additive, read-only, no schema changes
+   540→- New frontend: product-detail-drawer.tsx (Sheet with skeleton/error/stats/sections/footer); ProductsView name cell is now a detail-launching button
+   541→- Verified end-to-end: curl field-level checks, browser flows (open/Edit/Print/Escape/keyboard), mobile width, lint/tsc clean, dev.log 200s
+   542→- Known limitations: recentSales scoped to last 30 days (matches empty-state copy; older history lives in Sales view); SaleItem ordering borrows parent Sale.createdAt (SaleItem is timestamp-less); movements list capped at 15, sales at 12 by design
+   543→---
+   544→Task ID: 16 (cron round 9)
+   545→Agent: Z (main) + 3 parallel full-stack-developer agents (5-a, 5-b, 5-c)
+   546→Task: Status assessment + agent-browser QA + parallel feature development (product detail drawer, dashboard date navigator, expense attachments) + styling polish
+   547→
+   548→Work Log — status assessment:
+   549→- Baseline healthy at start: 10-view agent-browser sweep 0 console errors (desktop), lint 0 errors (1 pre-existing benign RHF warning), tsc clean in src/, dev.log all 200s, POS golden path verified (A4 Paper → cart ৳560)
+   550→- Decision: no bugs found → proceeded with feature development from worklog backlog (product detail drawer, dashboard date navigation, expense attachments)
+   551→- Pre-work foundation (main agent): pushed `Expense.attachment String?` to schema (bun run db:push) + dev server restart for fresh Prisma client; pre-added ALL new types to src/lib/types.ts (ProductDetail/ProductDetailStats/ProductSaleEntry, DashboardData.viewDate/isToday, Expense.attachment) so the three parallel agents would not conflict on shared files
+   552→
+   553→Work Log — new features shipped (parallel agents, disjoint file boundaries):
+   554→1. PRODUCT DETAIL DRAWER (agent 5-a): new GET /api/products/[id]/detail — product + 30d stats (units/revenue/profit/orders/stock values/marginPct/avgDailyQty7d/daysCover), last 12 sale lines (with customer, invoice, REFUNDED handling, line profit), last 15 stock movements. New products/product-detail-drawer.tsx: right Sheet (sm:max-w-xl) with avatar header + status/stock badges, 2×3 stat tile grid, recent-sales + movements scroll lists (max-h-64), supplier footer + Edit product / Print label actions, layout-mirroring skeleton, error retry, sr-only a11y names. ProductsView: product-name cell is now a focusable button (aria-label "View details for …") opening the drawer; wired onEdit/onPrintLabel handoff. Verified E2E incl. mobile 390
+   555→2. DASHBOARD DATE NAVIGATOR (agent 5-b): GET /api/dashboard accepts ?date=YYYY-MM-DD (isDayKey + round-trip guard, 400 on bad) — selected-day semantics (KPI block = chosen day, "yesterday" = day before so % deltas stay meaningful), hourly/payment/cash follow the selected day, daily trend + top products stay anchored to today, window auto-extends so days older than the 14-day trend resolve real data; response gains viewDate/isToday; no-param = byte-identical legacy behavior. DashboardView: date input (max=today) + Today/Yesterday chips, amber "Viewing <date> — live refresh off" chip, subtitle "Sales for <date> (historical view)", LIVE pill + countdown hidden in historical mode, auto-resume on return to today, KPI/chart titles re-date via data.isToday/viewDate. Bonus fix: dashboard grids gained base grid-cols-1 (recharts forced 524px horizontal overflow at 390px). Verified: 24 Sep → ৳1,11,527/13 tx matching daily[]; invalid date 400; empty day renders zeros gracefully
+   556→3. EXPENSE RECEIPT ATTACHMENTS (agent 5-c): expenses POST/PUT zod gains attachment (trim, ≤450KB, isValidImageUrl, '' → null; PUT undefined = untouched). New expenses/attachment-thumb.tsx: 40px row thumbnail button opening a viewer Dialog (max-w-2xl, max-h-[70vh] image, title = expense + amount, onError fallbacks: ImageOff glyph in thumb, message in viewer). expense-dialog.tsx: "Receipt attachment" field with 56px live preview, invalid-URL feedback, dashed empty tile, Remove button (sends attachment: null to clear server-side — verified). ExpensesView rows show the thumb (shrink-0, mobile-safe). Full curl suite: create→persist→clear→invalid-400; demo data restored to net zero afterwards
+   557→
+   558→Work Log — bugs fixed this round:
+   559→- (by agent 5-b, pre-existing) dashboard chart grids lacked grid-cols-1 causing 390px horizontal overflow from fixed-width recharts SVGs — fixed and verified overflow-free
+   560→- (by agent 5-c, transient) one 500 burst during concurrent recompile affected even pre-change paths; on-disk Prisma client confirmed healthy, no code change needed
+   561→- Note: agent 5-a found the dev server down mid-round and restarted it with the documented (setsid bun run dev &) double-fork
+   562→
+   563→Work Log — styling polish (mandatory, main agent):
+   564→- Dashboard header: date input + Today/Yesterday chips unified into a segmented toolbar (rounded-lg border bg-card/60 p-1, internal divider, h-7 compact controls, role=group aria-label); removes the loose row-of-controls look and wraps cleanly on mobile
+   565→- Product drawer: section headers now end with CountBadge pills (rounded-full bg-muted) instead of bare numbers; StatTile gained hover:bg-muted/70 transition + optional amber accent (border-amber-500/30 + amber tint bg) applied to Days-of-cover when daysCover ≤ 7 ("Restock soon" now visually pops at tile level)
+   566→- Dark-mode spot check of all changed views (dashboard/products/expenses) — tints and badges hold up in dark
+   567→
+   568→Verification:
+   569→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/
+   570→- agent-browser: full 10-view sweep after merge 0 console errors (light); dark spot checks clean; drawer open/Edit/Print-label handoffs verified; Yesterday/Today historical round-trip verified visually (KPIs ৳52,595/5tx/৳11,465 match API)
+   571→- API curls: dashboard (today/`?date`/400), products/[id]/detail (200 + 404), expenses attachment CRUD — all as designed; dev.log recent entries all 200
+   572→- Demo data delta: none (agents cleaned up test expenses; no purchases/stock changes this round)
+   573→
+   574→Stage Summary:
+   575→- Backend surface added: GET /api/products/[id]/detail; /api/dashboard ?date param (+viewDate/isToday fields); expense attachment validation in POST/PUT; Expense.attachment column
+   576→- Frontend added: product-detail-drawer.tsx, attachment-thumb.tsx; ProductsView row-click affordance; DashboardView historical date toolbar; expense dialog attachment field + row thumbnails
+   577→- All three features were built in parallel by isolated agents (5-a/5-b/5-c) with pre-shared types and disjoint file ownership — zero merge conflicts, final sweep green
+   578→- Known limitations: product detail covers 30d stats + 12 sales + 15 movements (fine for demo scale); dashboard historical view keeps recent-lists global (latest sales/expenses) by design; attachments are URL/data-URI only (no file storage); date navigator intentionally future-locked (max=today)
+   579→
+   580→Recommended next phase:
+   581→- Cashier shift tracking (auto-open X-report per login), stocktake session persistence server-side, product images in receipts + product performance report, supplier statement email/export, bulk barcode label sheet (multi-select), multi-user/auth pass
+   582→
+   583→---
+   584→Task ID: 17 (cron round 10)
+   585→Agent: Z (main)
+   586→Task: Status assessment + agent-browser QA + parallel feature development round 10
+   587→
+   588→Work Log — status assessment (main agent):
+   589→- Read worklog (581 lines): 9 prior rounds complete; last round shipped product detail drawer + dashboard date navigator + expense attachments, all verified green
+   590→- Baseline QA this round: agent-browser sweep of all 10 views → 0 console errors; POS golden path verified (A4 Paper → cart ৳560); lint 0 errors (1 pre-existing benign RHF warning); tsc clean in src/; dev.log all 200s
+   591→- Decision: NO bugs found → feature development round using the worklog backlog (bulk label sheet, product image upload, shift tracking, CSV export completion)
+   592→- Foundation pre-push: Prisma model Shift (openedAt, closedAt?, openingFloat, countedCash?, note?, openedBy?) synced via bun run db:push; shared types pre-added to src/lib/types.ts (Shift, ShiftCurrent, ShiftCloseResult) so parallel agents don't conflict
+   593→- Note: products/csv.ts `eader` scare was a grep truncation artifact — file is intact; CSV exports already exist for products/sales/reports (products+daily)/inventory movements; missing: expenses, customers, supplier statement
+   594→---
+   595→Task ID: 17-d
+   596→Agent: full-stack-developer
+   597→Task: CSV export completion pass — expenses, customers, supplier statement downloads
+   598→
+   599→Work Log:
+   600→- Read worklog + mirrored the established CSV pattern exactly (products/csv.ts + inventory/csv.ts): esc() cell escaping, '\uFEFF' BOM prefix, '\r\n' joins, Blob 'text/csv;charset=utf-8', temp <a> click + revokeObjectURL, dhakaDateKey-based filenames; button pattern mirrors ProductsView/InventoryView (outline, Download size-4, "hidden sm:inline Export CSV" + "sm:hidden CSV", disabled when list empty)
+   601→- NEW src/components/views/expenses/csv.ts — downloadExpensesCsv(expenses, fromKey?, toKey?): columns date (dhakaDateKey of spentAt), category name, method, note, amount (raw numbers, no formatting); filename expenses-{from}-to-{to}.csv when range given / expenses-{from}.csv single day / expenses-{date}.csv fallback
+   602→- NEW src/components/views/customers/csv.ts — downloadCustomersCsv(customers): name, phone, email, orders (_count.sales ?? 0), totalSpent, totalDue, creditLimit (empty when null = no limit), lastPurchaseAt (Dhaka day key, empty when never); exactly the fields the customer cards show; filename customers-{date}.csv
+   603→- NEW src/components/views/suppliers/csv.ts — downloadStatementCsv(statement, supplierName): one row per statement order with real SupplierStatementOrder fields only — supplier, date (createdAt day key), poNo, status, items, orderedQty, receivedQty, totalCost, receivedAt (day key, empty when null), note; filename supplier-statement-{slugified-name}-{date}.csv (slug falls back to "supplier" for non-latin names)
+   604→- ExpensesView.tsx: +Download icon import, +csv import, "Export expenses as CSV" outline button in PageHeader actions (first position, before Templates) wired to downloadExpensesCsv(expenses, from, to) so the filename reflects the viewed month; disabled={expenses.length === 0}; nothing else touched
+   605→- CustomersView.tsx: same surgical wiring — "Export customers as CSV" first in actions (before Aging), disabled={customers.length === 0}
+   606→- suppliers/statement-dialog.tsx: "Export statement as CSV" button added in the footer row mirroring the Print statement button exactly (variant outline, size sm, h-9, size-3.5 icon), placed before Print; disabled={!s || s.orders.length === 0} so empty PO history no-ops
+   607→
+   608→Verification:
+   609→- bun run lint: 0 errors (1 pre-existing benign RHF warning in product-dialog.tsx, untouched); bunx tsc --noEmit: 0 errors in src/ (only pre-existing examples/+skills/ errors remain)
+   610→- Functional CSV verification WITHOUT relying on browser downloads: patched URL.createObjectURL + a.click via agent-browser eval, clicked each real button, captured the exact Blob the builder produced — expenses: expenses-2026-09-01-to-2026-09-30.csv, UTF-8 BOM bytes EF BB BF confirmed via arrayBuffer, CRLF confirmed, header date,category,method,note,amount, 17 data rows, raw amounts; customers: customers-2026-09-27.csv, BOM ok, 8 rows with real aggregates (Imran Chowdhury,8,73787,0,,2026-09-20); statement: supplier-statement-dhaka-wholesale-mart-2026-09-27.csv, BOM ok, 2 PO rows (PO-20260927-0007/-0005) matching the dialog table
+   611→- E2E UI: buttons present in snapshot with correct aria-labels and responsive labels; expenses + customers clicks produced zero page errors/console errors; statement button verified DISABLED for a 0-PO supplier (Anwar Trade International: "No purchase orders yet") and ENABLED + working for Dhaka Wholesale Mart
+   612→- Screenshots: /tmp/qa-csv-buttons.png (statement dialog open w/ Export CSV in footer), /tmp/qa-csv-buttons-expenses.png, /tmp/qa-csv-buttons-customers.png, /tmp/qa-csv-buttons-customers-dark.png (dark-mode spot check)
+   613→- dev.log: zero 500s/errors across whole log; my traffic all 200s
+   614→- Note: agent-browser does not persist blob downloads to disk, so file-landing check was replaced by the Blob-capture method above (strictly stronger: inspects exact bytes/filename)
+   615→
+   616→Stage Summary:
+   617→- All three remaining CSV exports shipped: expenses (month-range filename), customers (profile + aggregates), supplier statement (PO rows) — all BOM+CRLF, escaped, raw numbers, theme-token outline buttons, aria-labels, dark-mode safe, empty-list disabled
+   618→- Files: NEW src/components/views/expenses/csv.ts, src/components/views/customers/csv.ts, src/components/views/suppliers/csv.ts; EDITED ExpensesView.tsx, CustomersView.tsx, suppliers/statement-dialog.tsx (one button + imports each) — no other files touched, no new packages
+   619→- Known limitations: client-side export only exports what the current filter loads (expenses capped at limit 500 like the view; statement exports the last-N POs the API returns); statement CSV contains PO lines only, not portfolio/top-products aggregates (by design, task scope); non-latin supplier names slug to "supplier" in the filename
+   620→
+   621→---
+   622→Task ID: 17-b
+   623→Agent: full-stack-developer
+   624→Task: Product image FILE upload with client-side canvas resize in the product dialog (new ImagePicker component)
+   625→
+   626→Work Log:
+   627→- READ-ONLY research first: worklog (expense-attachment UX conventions), product-dialog.tsx, expense-dialog.tsx attachment field, both product API routes, product-avatar.tsx, types.ts, isValidImageUrl in src/lib/api-utils.ts (cap = string length > 300_000; schemes http(s) / data:image png|jpe?g|webp|gif|svg+xml)
+   628→- Cap parity finding: client zod `.max(300_000)` in product-dialog EXACTLY matches the API cap in isValidImageUrl (300,000 chars measured on the string) → NO zod adjustment needed; ENCODE_LADDER measures `uri.length` (chars, same metric as server) not bytes
+   629→- NEW src/components/views/products/image-picker.tsx — self-contained picker wired to RHF via value/onChange props (value = string | null, '' = none): (a) clickable 96px dashed drop-tile (size-24, rounded-md — expense-attachment visual language scaled up) opening a hidden `<input type=file accept=image/*>`; drag-over highlight + drop-to-upload on both empty and preview tiles (input.target.value reset after read so same-file re-select fires); (b) client-side resize: file → objectURL → Image decode → canvas (max dim 640px, aspect preserved, never upscaled, white backdrop flattens transparency for dark mode) → toDataURL('image/jpeg', 0.82); if result > 300,000 chars, ladder re-encodes at 640/q0.6 → 512/q0.5 → 384/q0.4 → 256/q0.35, first fit wins; inline destructive error if nothing fits ("could not compress under the 300KB limit"); (c) live preview img (object-cover, rounded, "Product image preview" alt) with hover/focus "Replace" overlay + explicit ghost Replace (RefreshCw) + ghost Remove (X, hover:text-destructive) — hidden while empty; (d) loading state: Loader2 spinner on tile + aria-live helper "Resizing image…"; inline errors for non-image files ("Please choose an image file…") and decode failures; broken remote URL degrades to ImageOff tile + "Invalid image URL" (derived brokenSrc comparison — no setState-in-effect); (e) exported validateImageValue() mirrors the server rules (scheme + 300k cap) and shows a role=alert inline error BEFORE submit; (f) secondary "or paste image URL" collapsible toggle (aria-expanded/controls) — auto-opened on mount when the current value is an http(s) URL (edit prefill); when value is a data URI the input renders empty with placeholder "Paste https://… to replace the uploaded image" (typing overwrites the upload); helper row shows "~15KB of 300KB" for uploads
+   630→- product-dialog.tsx: replaced the raw `register('imageUrl')` Input + static ProductAvatar preview with `<ImagePicker value={watch('imageUrl')} onChange={(v) => setValue('imageUrl', v, {shouldValidate: true, shouldDirty: true})} error={errors.imageUrl?.message} disabled={isSubmitting} />`; removed ProductAvatar import (still used by POS/table — untouched); zod rules, EMPTY defaults, edit-mode reset (`imageUrl: product.imageUrl ?? ''`), and payload (`imageUrl: v.imageUrl.trim() || null` — empty → null clears server-side) all unchanged
+   631→- Files touched: ONLY product-dialog.tsx + new image-picker.tsx (no API, schema, types, ProductsView, or drawer changes)
+   632→
+   633→Verification:
+   634→- bun run lint: my 2 files = 0 errors / 1 pre-existing benign RHF warning; NOTE the global run currently shows 1 error in src/components/views/pos/shift-bar.tsx:34 (setState-in-effect) — that is the concurrent task 17-a agent's file (out of my ownership), not mine; bunx tsc --noEmit: 0 errors in src/
+   635→- agent-browser E2E (isolated session, real in-browser canvas): on "Edit Ballpoint Pen Pack (10)" (starts with imageUrl null) → generated a 1600×1200 PNG in-page (2,146,110 bytes) → injected via DataTransfer onto the hidden input + change event → preview rendered at 640×480 JPEG, data URI = 15,591 chars (≤300,000 cap), helper "Uploaded image · ~15KB", Remove/Replace present → screenshot /tmp/qa-product-image-upload.png → Save → GET /api/products?search=Ballpoint shows the 15,591-char data:image/jpeg persisted
+   636→- Reopen edit → preview prefills from persisted value; URL toggle expands with replace-placeholder; typed "ftp://x" → instant role=alert "Must be an http(s) URL or a data:image URI" (before submit); typed tiny data:image/png URI → error cleared, preview switched (118 chars) → Save → API shows the PNG URI
+   637→- Remove flow: reopen → Remove → empty dashed tile (Remove hidden, helper back to upload copy) → Save → API imageUrl = null (pen product back to its original state — demo data net zero; STA-001/SNK-005/ELC-003 only opened/cancelled, untouched)
+   638→- Negative + drag-drop: text/plain file → "Please choose an image file (JPG, PNG, WebP or GIF)"; synthetic DragEvent drop of an 800×600 PNG onto the tile → resized 10,375-char JPEG preview (drop path works); Escape after upload (no save) left the product null
+   639→- Edit-with-existing-image prefill: "Edit A4 Paper Rim (500s)" (STA-001 data URI) → preview renders, no crash, cancel clean
+   640→- Mobile 390px: scrollWidth = 390 = viewport (zero horizontal overflow), 96px tile at correct gutter; screenshot /tmp/qa-product-image-upload-mobile.png
+   641→- dev.log: all product PUT/GET calls 200, no compile errors; browser console clean (only HMR noise); page errors: none
+   642→
+   643→Stage Summary:
+   644→- Product dialog now supports real image FILE upload (click + drag-drop) with client-side canvas resize to ≤640px JPEG (quality ladder down to fit the API's 300,000-char data-URI cap), live preview, Replace/Remove, broken-URL fallback, instant scheme/size validation feedback, and the preserved paste-URL flow — all persisted through the unchanged imageUrl column and unchanged API validation
+   645→- Constraints honored: only product-dialog.tsx + new files under products/ touched; no schema/npm changes; empty → null on create; edit prefill + reset intact; 390px-safe; dark-mode-friendly theme tokens only; aria-labels + role=alert throughout
+   646→- Known limitations: uploads are stored as inline data URIs (≤300KB) — no server-side file storage in sandbox; JPEG export drops GIF/SVG animation & alpha (white-flattened); canvas EXIF orientation relies on modern browser auto-orientation; global lint currently carries one pre-existing error owned by the concurrent 17-a shift-tracking agent
+   647→
+   648→---
+   649→Task ID: 17-a
+   650→Agent: full-stack-developer
+   651→Task: Bulk barcode label printing via multi-select (products checkbox column + floating bulk bar + BulkLabelSheet dialog + print CSS)
+   652→
+   653→Work Log:
+   654→- Read worklog conventions + sources first: ProductsView, label-sheet.tsx, barcode39.tsx, globals.css print sections, receipt.tsx (body-portal clone pattern), pnl-print.tsx, ui/checkbox.tsx, ui/dialog.tsx, app shell/footer
+   655→- KEY PRINT-ARCHITECTURE FINDING: the blanket print rule `body.<class> *:not(.area):not(.area *)` hides ALL ancestors of an inline-rendered clone too (display:none on an ancestor kills the subtree), so the clone MUST be a direct child of <body> (createPortal to document.body, as receipt.tsx does). Noted latent pre-existing issue: single LabelSheet sets `printing-label` + sessionStorage but renders NO .label-print-area clone anywhere (globals.css styles it, nothing renders it) → its print output is currently a blank page. label-sheet.tsx is not in my allowed-files list, so left untouched and documented instead (see Stage Summary)
+   656→- NEW src/components/views/products/bulk-label-sheet.tsx: Dialog sm:max-w-2xl — title "Print barcode labels — N products", global "Copies per product" Input (number, 1–24, default 12 to MATCH single LabelSheet default), emerald aria-live total badge "{copies×N} labels total", scrollable preview (max-h-[50vh] overflow-y-auto, grid-cols-2 sm:grid-cols-3) of LabelTile (name / Barcode39 of barcode||sku / sku + price — visually identical to the single-label preview tile incl. white bg + black text + dashed border); footer Cancel + "Print {total} labels" (Spinner while printing)
+   657→- Print flow mirrors label-sheet.tsx exactly: sessionStorage 'app.printing-bulk-labels' = copies → body class 'printing-bulk-labels' → window.print() → finally-cleanup after 300ms (class removed, key removed). Hidden .bulk-label-print-area clone (aria-hidden, display:none) is createPortal'd DIRECTLY to document.body; .bulk-label-grid repeats every product tile `copies` times reactively (verified: copies=3 → 9 clone cells)
+   658→- globals.css: added ONE new @media print block (after the round-2 label section): body.printing-bulk-labels blanket-hide + clone display block/absolute/8mm padding + 3-up .bulk-label-grid (repeat(3,1fr), 4mm gap) + .bulk-label-cell break-inside avoid + paper-safe overrides (dashed #64748b border, white bg, black text). Independent body class → existing single-label/receipt/report print paths byte-identical
+   659→- ProductsView.tsx: added first checkbox column (header Checkbox = select-all/clear on visible rows with Radix 'indeterminate' when partial + dynamic aria-label; row Checkbox aria-label "Select {name}"); selection = Set<string> of ids with derived `selectedVisible = products.filter(has)` used for bar count, dialog products and header state — counts/dialog can never drift from what's visible (ids filtered out idle in the Set; no phantom rows, no effects). Floating bulk bar (fixed bottom-3/4, left-1/2 -translate-x-1/2, z-50, rounded-full border bg-card/95 shadow-lg backdrop-blur, animate-in fade-in slide-in-from-bottom-4, role=toolbar, aria-live count) with "N selected" + default "Print labels" + ghost "Clear"; root div gets pb-16 transition when bar visible so last rows/footer are never covered. BulkLabelSheet conditionally rendered with empty-selection guard (bar hidden at 0, dialog can't open at 0). Row Edit/label/archive buttons, product-name detail button, drawer handoffs, ProductDialog, LabelSheet — all untouched
+   660→- No new npm packages; no API/types changes; lucide Printer icon only
+   661→
+   662→Verification:
+   663→- bun run lint: 0 errors (only the pre-existing benign RHF warning in product-dialog.tsx); bunx tsc --noEmit: 0 errors in src/ (only pre-existing examples//skills/ errors remain)
+   664→- agent-browser (isolated session qa17a) E2E on #/products: 3 row checkboxes → toolbar "3 selected", 3/45 rows checked, header checkbox aria-checked="mixed" (indeterminate), main padding-bottom 64px; "Print labels" → dialog "Print barcode labels — 3 products", copies default 12, "36 labels total", 3 preview tiles each with barcode SVG; copies→3 → "9 labels total" + "Print 9 labels"; Escape closes dialog, bar persists with selection; header select-all → 45/45 checked + header "checked" + "45 selected"; Clear → toolbar gone, header unchecked, 0 rows checked
+   665→- Regressions: row Edit opens "Edit product" sheet; product name opens detail drawer (footer Edit product / Print label for …); drawer Print label hands off to single "Print barcode labels" dialog (copies default 12) — single LabelSheet flow unchanged
+   666→- Print pipeline proven: clone is direct body child, aria-hidden, display:none on screen, 36 cells at default (12×3), reactive to copies (9 cells @3); triggered real doPrint (spied window.print + called) → 'printing-bulk-labels' added then removed after ~300ms, sessionStorage key cleaned, no stuck body class
+   667→- Print OUTPUT verified via print-media PDF (agent-browser pdf + pdftotext): with body class set → PDF contains ONLY the 36 label tiles (A4/Android/Blender exactly 12× each, 3 A4 pages, 0 page-chrome strings); footer .no-print hidden confirming print media applied. (One earlier pdf attempt showed page content — transient CLI/CDP race; deterministic re-run passed 3×; set media reset to no-preference afterwards)
+   668→- Mobile 390px: scrollWidth 390 == innerWidth (zero horizontal overflow) with selection + bar visible; bar fully in viewport (12px from bottom); dialog 358px wide, 2-col preview, no overflow. Dark mode: bar dark card bg + subtle border readable; dialog chrome dark, tiles intentionally white paper-look (same as single label preview)
+   669→- Screenshots: /tmp/qa-bulk-labels.png (desktop, 45 selected + bar, VLM-verified clean), /tmp/qa-bulk-dialog-3products.png, /tmp/qa-bulk-dialog-mobile-390.png, /tmp/qa-bulk-bar-dark.png, /tmp/qa-bulk-dialog-dark.png (VLM-verified), /tmp/qa-print3.pdf (print isolation proof), /tmp/qa-print-emulated.png
+   670→- dev.log: recent tail all 200s, HMR "Compiled" lines only, zero errors (shifts entries = concurrent agent's traffic, not this task); no demo-data mutations (all interactions read-only; Escape/Cancel cleanup verified)
+   671→
+   672→Stage Summary:
+   673→- Products view now has multi-select: checkbox column (select-all w/ indeterminate, per-row aria-labels), floating bulk bar ("N selected" / Print labels / Clear) with pb-16 content guard, and BulkLabelSheet dialog — scrollable preview tiles (name + Code39 + sku/price), global copies-per-product 1–24 (default 12 matching single sheet), live computed total, and a WORKING print path: .bulk-label-print-area clone portalled to <body> + new printing-bulk-labels print CSS (3-up A4 grid, page-break-safe cells), isolated from every other print flow
+   674→- Files: NEW src/components/views/products/bulk-label-sheet.tsx; modified src/components/views/ProductsView.tsx + src/app/globals.css (print CSS addition only). label-sheet.tsx, product-dialog.tsx, product-detail-drawer.tsx, types.ts, API routes untouched
+   675→- Known limitation (pre-existing, out of scope): the SINGLE-product LabelSheet print is latently broken (blank page) because it sets body.printing-label + sessionStorage but no .label-print-area clone is rendered anywhere; fix = one createPortal clone in label-sheet.tsx mirroring this task's bulk pattern — recommend for next round (file was outside this task's allowed set)
+   676→- Selection is per-visit component state (lost on unmount/hash change — per spec); ids filtered out of the current view idle in the Set and never surface in counts/dialog
+   677→---
+   678→Task ID: 17-c
+   679→Agent: full-stack-developer
+   680→Task: Cashier shift tracking end-to-end — /api/shifts (+current, [id]/close) and POS shift bar with open/close dialogs
+   681→
+   682→Work Log:
+   683→- READ-ONLY research first: worklog conventions, prisma/schema.prisma (Shift model pre-existed — untouched; Expense HAS paymentMethod CASH|CARD|MOBILE|BANK → cash-expense tracking uses it), src/lib/types.ts (Shift/ShiftCurrent/ShiftCloseResult pre-added — untouched), api-utils (bad/round2/zodMsg/numParam), api client, PosView header (PageHeader actions slot with Held/Clear), sales + reports (zReport math) + expenses routes, dialog.tsx, page-bits, x-report/z-report (number-grid style), receipt.tsx (body-class + hidden print-area clone pattern), globals.css print sections
+   684→- BACKEND src/app/api/shifts/route.ts: GET ?limit≤50 default 20 → { shifts } desc; POST zod { openingFloat ≥0 default 0, openedBy ≤80, note ≤500 } (tolerates empty body via .catch(()=>({}))) — 409 {error:'A shift is already open'} when a closedAt=null shift exists (findFirst), else create openedAt=now, 201
+   685→- BACKEND src/app/api/shifts/totals.ts (co-located helper, no new lib files): shiftTotals(from, to, openingFloat) — 7 parallel aggregates over window [from, to): transactions/gross (COMPLETED), refunds (REFUNDED), cash/card/mobile (COMPLETED per method), cashRefunds (REFUNDED & CASH), expensesPaid = Σ Expense.amount where spentAt in window AND paymentMethod='CASH' (Expense model has the method column — used it, did NOT zero it); netSales = gross−refunds; expectedDrawer = round2(openingFloat + cashSales − cashRefunds) per spec (expenses NOT deducted — shown as info only)
+   686→- BACKEND src/app/api/shifts/current/route.ts GET: open shift or { shift:null, totals: all-zeros, expensesPaid:0 }; live window [openedAt, now)
+   687→- BACKEND src/app/api/shifts/[id]/close/route.ts POST: { countedCash ≥0 required, note? ≤500 }; 404 unknown id, 400 already closed; recomputes totals over [openedAt, closeTime) (lt), closedAt=now, countedCash stored, close note appended to existing open note with " — " separator; variance = round2(countedCash − expectedDrawer); returns ShiftCloseResult. All routes force-dynamic, bad()/zodMsg() error style, [id] route uses `params: Promise<{id}>` (Next 16)
+   688→- FRONTEND src/components/views/pos/shift-bar.tsx (new): useApi('/api/shifts/current', pollMs 30s); `now` timestamp via useState(() => Date.now()) + 30s interval ONLY (react-hooks/set-state-in-effect rejected my first effect-set pattern — rewrite is hydration-safe since SSR renders no chip, data arrives post-mount); no shift → outline "Start shift" (Play); open shift → compact chip: pulsing emerald dot + "Shift open · 2h 05m" (elapsed floored to minute) + expected drawer (Wallet + fmtMoney, shrink-0) + ghost "End shift" (Square, size sm); renders null on first load/error; mounts both dialogs; End click refetches before opening; onOpened/onClosed → refetch
+   689→- FRONTEND src/components/views/pos/shift-open-dialog.tsx (new): Opening cash in drawer (number, min 0, step 0.01, default '0', required), Cashier (optional, placeholder "Cashier name", max 80), Note textarea (max 500); fields reset on open (open-guarded effect — no set-state-in-effect violation); POST /api/shifts → sonner toast "Shift opened · Drawer starts with ৳X" → onOpened
+   690→- FRONTEND src/components/views/pos/shift-close-dialog.tsx (new): two phases (form → done). Form: local ShiftSummary grid (Stat tiles Transactions/Gross/Refunds/Net + Payments Received block CASH/CARD/MOBILE + emerald Cash Drawer block: Opening float, +Cash sales, −Cash refunds (derived = openingFloat+cashSales−expectedDrawer so the block visibly adds up), −Cash expenses (amber info, footnoted "not deducted from expected drawer"), Expected in drawer) — style mirrors ZrStat without importing x-report; Counted cash input (min 0, required) + helper "Expected in drawer: ৳X" + aria-live variance preview: emerald "+৳X over" / red "−৳X short" / muted "৳0.00 — exact" / muted hint when empty; note textarea; submit disabled until valid. Done: variance banner (tone-colored, Counted vs Expected), same summary with result data + closed time, footer Print (outline) + Done; toast on success
+   691→- PRINT: ShiftClosePaper (print header "Shift Report · Cash Close", meta, summary, counted/expected/variance, note, footer) rendered in a hidden `.shift-print-area` clone inside the dialog (inline display:none, x-report pattern); new globals.css section `body.printing-shift` + `.shift-print-area` (clone-only on paper, black on white, max-width 140mm) appended before the label-print block (comment restored after edit); Print button adds body class → window.print() → removes after 500ms
+   692→- PosView.tsx wire-in (minimal): import ShiftBar + render as FIRST item of PageHeader actions (before Held/Clear); no other restructure. Chip is flex-wrap friendly — on 390px it sits on its own header row, Held/Clear wrap below, zero horizontal overflow
+   693→- Dev server note: found down at smoke-test time (no bun process, log clean) → restarted detached per runbook (`setsid bun run dev >> dev.log 2>&1`), came back healthy; no compile errors since
+   694→
+   695→Verification:
+   696→- bun run lint: 0 errors (1 pre-existing benign RHF warning in product-dialog.tsx); bunx tsc --noEmit: 0 errors in src/ (4 pre-existing errors only in examples/ + skills/, untouched)
+   697→- curl suite: POST /api/shifts {openingFloat:500, openedBy:"QA Agent 17c"} → 201 (id cmuivov8d…); GET current → shift open, totals all 0, expectedDrawer 500; POST open again → 409 {error:'A shift is already open'}; POST openingFloat:-5 → 400; openedBy 81 chars → 400; GET /api/shifts/current cross-checked with a raw Prisma bun script (/home/z/my-project/.qa-tmp/qa-shift-check.ts, deleted after): identical window math (salesInWindow 0 — today's 3 seed sales ৳6,940 all predate the shift open; GET /api/sales?from=2026-09-27 summary confirms the day total), expectedDrawer 500; POST close countedCash 1200 → variance 700 = 1200−500 exactly, ShiftCloseResult shape (shift/totals/expensesPaid/variance); GET current → { shift:null, totals zeros }; GET /api/shifts → history shows closed shift; close again → 400 'Shift is already closed'; close bogus id → 404 'Shift not found'; expense path: created CASH 120.5 + CARD 80 expenses inside window → expensesPaid 120.5 (CARD excluded), then both DELETEd (net-zero hygiene); note append: shift with open note "Morning shift" closed with "Evening count" → stored "Morning shift — Evening count"
+   698→- agent-browser E2E (isolated session, 1280px): /#/pos → "Start shift" → dialog (float 500, cashier "Rahim", note) → Open shift → toast "Shift opened · Drawer starts with ৳500.00 · Rahim" → bar chip "Shift open · 0m" + ৳500.00 + "End shift" → End shift → dialog shows live summary (meta "Opened 27 Sep 2026 03:07 AM · Rahim", transactions/gross/refunds/net, payments, drawer block, helper "Expected in drawer: ৳500.00") → typed 1200 → live preview "Variance: +৳700.00 over" (emerald, verified computed color) → Close shift → done phase "VARIANCE +৳700.00 over · Counted ৳1,200.00 · Expected ৳500.00" → Print button present + hidden .shift-print-area clone verified in DOM (display:none, contains "Shift Report · Cash Close" + variance) → Done → bar back to "Start shift". Mobile 390×844: scrollWidth 390 = viewport (zero overflow), chip fits its own row, screenshots taken; muted "৳0.00 — exact" variant verified on a 0/0 close; dark mode chip verified (border token white/10, screenshot). Screenshots: /tmp/qa-shift-open.png, /tmp/qa-shift-bar.png, /tmp/qa-shift-close.png, /tmp/qa-shift-bar-mobile.png, /tmp/qa-shift-bar-dark.png
+   699→- dev.log: all shift calls as designed — 201/200/409/400/404 lines present, no compile errors; server restarted once (was down before my first smoke test, log clean)
+   700→- DATA HYGIENE: 6 closed QA shifts remain in Shift table (real usage data, harmless — all closed, countedCash/variance consistent; none open). No fake sales created. QA cash/card test expenses deleted. Two desktop QA shifts (float 500/counted 1200 → +700; float 100/counted 100 → exact) plus UI-driven shifts
+   701→
+   702→Stage Summary:
+   703→- Cashier shifts are live end-to-end: POST /api/shifts (single-open enforced server-side, 409), GET /api/shifts (history ≤50), GET /api/shifts/current (live ShiftCurrent), POST /api/shifts/[id]/close (ShiftCloseResult with variance); POS header carries a self-contained ShiftBar (Start shift → live chip with elapsed + expected drawer → End shift → summary + counted cash + live variance preview → final variance + printable close report)
+   704→- Totals math: window [openedAt, now|closeTime); expectedDrawer = openingFloat + cashSales − cashRefunds; expensesPaid = CASH-method expenses in window (informational, NOT deducted from expected drawer — per spec, footnoted in UI); all values round2
+   705→- Files: src/app/api/shifts/{route,totals,current/route,[id]/close/route}.ts, src/components/views/pos/{shift-bar,shift-open-dialog,shift-close-dialog}.tsx, PosView.tsx (2-line wire-in), globals.css (print block only). No schema/types changes; no new npm packages
+   706→- Known limitations: shifts are global (no auth — openedBy informational); one-shift-at-a-time race is findFirst-guarded (SQLite serializes writes; simultaneous double-open not otherwise locked); close dialog prints the summary only (no Z-report coupling); expectedDrawer deliberately ignores cash expenses (policy per spec); elapsed/poll at 30s so the chip label can lag up to 30s; variance preview rounds client-side (r2) matching server rounding
+   707→
+   708→Work Log — features shipped (parallel agents, disjoint file ownership):
+   709→1. BULK BARCODE LABEL SHEET (17-a): ProductsView gained a checkbox column (header select-all w/ Radix indeterminate, per-row aria-labels) + floating bulk action bar (fixed bottom-center, animate-in, role=toolbar, pb-16 root guard) + NEW products/bulk-label-sheet.tsx (preview grid, copies-per-product 1–24 default 12, live total badge, print via body.printing-bulk-labels + body-portalled .bulk-label-print-area clone; new print CSS block in globals.css). Verified E2E incl. real print-media PDF (36 labels, 3 pages, zero page chrome), mobile 390px, dark mode
+   710→2. PRODUCT IMAGE FILE UPLOAD (17-b): NEW products/image-picker.tsx — dashed drop-tile + hidden file input + drag-drop, canvas resize (max 640px → JPEG q0.82, quality ladder down to fit the API's 300,000-char data-URI cap), live preview + Replace/Remove, collapsible "or paste image URL", role=alert inline errors; wired into product-dialog.tsx via RHF value/onChange (zod unchanged, matches server cap). Verified with a real 2.1MB canvas-generated file → 15,591-char URI persisted/cleared via API; mobile + dark OK; demo data net zero
+   711→3. CASHIER SHIFT TRACKING (17-c): Shift model (pre-pushed) + NEW src/app/api/shifts/{route.ts, current/route.ts, [id]/close/route.ts, totals.ts} — open (409 on double-open, negative float 400), live totals (7 parallel aggregates; expectedDrawer = float + cash sales − cash refunds; cash expenses via Expense.paymentMethod), close (countedCash required, variance computed, note appended, 400/404 guards), GET history (?limit≤50). NEW pos/shift-bar.tsx (30s-poll chip: emerald pulse dot + elapsed + expected drawer + End shift; hydration-safe) + shift-open-dialog.tsx + shift-close-dialog.tsx (summary grid + live aria-live variance preview + print via body.printing-shift clone). Curl suite incl. raw-Prisma cross-check of totals math; mobile chip wraps to own row; 6 closed QA shifts remain in Shift table (real usage data)
+   712→4. CSV EXPORT COMPLETION (17-d): NEW expenses/csv.ts + customers/csv.ts + suppliers/csv.ts (BOM + CRLF + esc, real field coverage; statement filename slugs supplier name) + one surgical Export CSV button each in ExpensesView / CustomersView / suppliers statement-dialog (disabled when empty). Verified by patching URL.createObjectURL via agent-browser eval and inspecting exact Blob bytes + filenames (BOM EF BB BF confirmed ×3); statement button correctly disabled for 0-PO supplier
+   713→
+   714→Work Log — bugs fixed this round (main agent):
+   715→- PRE-EXISTING BLANK PRINT (found by 17-a): single-product LabelSheet set body.printing-label but never rendered the .label-print-area clone its print CSS expects → print output was a blank page. Fixed in label-sheet.tsx by adding the body-portalled clone (copies × .label-cell in .label-grid) mirroring the bulk/receipt pattern; print-media PDF now shows 12 correct labels (3-up, Code39, price) — /tmp/qa-single-label-print2.pdf
+   716→
+   717→Work Log — styling polish (mandatory, main agent):
+   718→- Products bulk bar: selection count upgraded to a primary-tinted pill (rounded-full bg-primary/10, tabular-nums) with title hint; NEW keyboard detail — Escape clears the selection when no dialog/sheet is open and focus isn't in a form field (guarded window keydown effect); root pb-16 transition retained
+   719→- Shift chip: hover:shadow-sm transition + explanatory titles ("Current cashier shift — click End shift to count the drawer", elapsed title shows open time)
+   720→- LabelSheet refactor: JSX re-indented into fragment + portal (fix above) — visual output unchanged
+   721→
+   722→Verification (main agent):
+   723→- bun run lint: 0 errors (1 pre-existing benign RHF warning); bunx tsc --noEmit: 0 errors in src/ (pre-existing skills/ error only)
+   724→- agent-browser: 10-view sweep ×2 (pre/post polish) 0 console errors; dark-mode spot checks of POS chip + bulk bar + products; mobile 390px scrollWidth == 390 on pos/products with bar visible and in-viewport; Escape-to-clear verified live (46 selected → Escape → 0 + bar hidden); note: synchronous post-click DOM checks can race React flush — use a small delay before asserting checkbox state in future QA
+   725→- dev.log: compiles clean, all API 200/201/400/409/404 as designed; QA shift closed with countedCash = expected → variance 0 (documented in Shift table)
+   726→
+   727→Stage Summary:
+   728→- Backend surface added: /api/shifts (GET history, POST open), /api/shifts/current, /api/shifts/[id]/close; Shift table live
+   729→- Frontend added: bulk-label-sheet.tsx, image-picker.tsx, shift-bar/open/close dialogs, 3 new csv.ts helpers + Export CSV buttons; ProductsView multi-select + floating bulk bar; LabelSheet print clone fix
+   730→- Cashier shift lifecycle is now end-to-end: open with float → live drawer expectation on POS → close with counted cash → variance + printable summary → history retained (no UI for history yet — API ready)
+   731→- Data delta: Shift table holds 7 closed QA shifts (real usage records, harmless); sales/products/expenses net zero
+   732→
+   733→Known limitations / risks:
+   734→- Shift totals window uses server "now" (close time) — a shift left open across midnight still computes correctly (window is absolute), but POS elapsed chip only refreshes every 30s by design
+   735→- expectedDrawer ignores cash expenses (footnoted in the close dialog); only one global shift at a time, openedBy is free text (no auth yet)
+   736→- Bulk label print for very large selections (500 × 24 copies) is heavy DOM — fine at demo scale
+   737→- Image upload is a client-side data URI (≤300KB) — no server file storage in sandbox; animated GIFs/SVG alpha lost in JPEG re-encode
+   738→- Single-label print still uses the legacy sessionStorage copies key — harmless duplicate of the bulk key
+   739→
+   740→Recommended next phase:
+   741→- Shift history UI (Sales or Settings tab: list shifts + reprint close report), auto-suggest opening shift when POS sale attempted with none open, product images inside sale receipts (SaleItem.imageUrl snapshot), server-side multipart image upload, shift-aware dashboard strip (current drawer + shift sales), multi-user/auth pass
+   742→
+   743→---
+   744→Task ID: 18 (cron round 11)
+   745→Agent: Z (main)
+   746→Task: Status assessment + agent-browser QA + parallel feature development round 11
+   747→
+   748→Work Log — status assessment (main agent):
+   749→- Round 10 handover read: bulk labels, image upload, shift tracking, CSV exports all verified green; 7 closed QA shifts in DB (expected)
+   750→- Baseline QA this round: 10-view sweep 0 console errors; POS golden path (cart ৳560); GET /api/shifts + /current healthy; lint 0 errors; src/ tsc clean
+   751→- Decision: NO bugs → feature round from worklog backlog (shift history UI, receipt product images, POS shift guard + dashboard shift strip, notification center)
+   752→- Foundation pre-push: schema gains Shift.totalsJson String? (close-time snapshot for history/reprint without recompute) + SaleItem.imageUrl String? (receipt thumbnail snapshot) via bun run db:push; types.ts pre-gains SaleItem.imageUrl?, Shift.totalsJson?, ShiftSnapshot
+   753→
+   754→---
+   755→Task ID: 18-d
+   756→Agent: full-stack-developer
+   757→Task: Real notification center — header bell becomes a live alerts dropdown (new /api/notifications + NotificationBell popover)
+   758→
+   759→Work Log:
+   760→- READ-ONLY research first: worklog (752 lines), app-header.tsx (old static bell fetched /api/dashboard once on mount), popover.tsx (shadcn/Radix), dashboard route (today window + lowStock math), api-utils (round2/bad), format.ts (startOfTodayUTC/addDaysUTC/fmtTime/fmtMoneyInt), use-api.ts (pollMs + silent refetch), api.ts, page.tsx hash sync (setView → hash), ui store (ViewKey), shifts/current route + Shift schema (openedBy free text)
+   761→- NEW src/app/api/notifications/route.ts (GET, force-dynamic): 4 parallel Prisma queries (active products select-only, open shift findFirst, sale groupBy by status over Dhaka day window → COMPLETED totals + REFUNDED count in ONE query, expense aggregate) → { lowStock ≤8 (stock>0 && ≤reorderLevel, sorted by stock/reorder ratio asc), outOfStock ≤8 (name asc), openShift|null, today{sales,transactions,expenses}, refundedToday, generatedAt }; round2 on money; window = [startOfTodayUTC, +1d) — identical to dashboard's live-today math so numbers match exactly
+   762→- NEW src/components/app/notification-bell.tsx: replaces old header popover. Local NotificationsData interface (route shape NOT imported client-side — declared in component file per App Router constraint). useApi('/api/notifications', pollMs 60_000) + silent refetch on every popover open. Badge = lowStock+outOfStock+openShift+refunds>0 (Today row info-only, uncounted), hidden at 0, 9+ cap, severity colors: red (outOfStock) → amber (lowStock) → emerald (shift/refunds only). PopoverContent w-[340px] max-w-[calc(100vw-1rem)] p-0; body max-h-[70vh] overflow-y-auto + scrollbarGutter stable (global thin-scrollbar CSS already in globals.css). Sections with 11px uppercase headers + tinted icon chips (red PackageX / amber PackageOpen / emerald Clock · TrendingUp · red Undo2) + count; rows are real <button>s with aria-labels, hover:bg-muted/50, truncate, tabular-nums trailing ("0 in stock" red, "X left · reorder at Y" amber, "Shift open · 2h 15m"+"by NAME", "৳X · Y sales · ৳Z expenses today", "N refunds today"); navigation via setView (shell syncs #/… hash): outOfStock→products, lowStock→inventory, shift→pos, today→dashboard, refunds→sales; empty state "You're all caught up" + BellOff emerald chip when zero actionable; skeleton rows while loading; error state w/ retry hint. Footer: "Refreshed HH:MM" (fmtTime on generatedAt) + ghost RefreshCw icon button (animate-spin while refreshing — useApi's silent refetch exposes no in-flight state, so a 900ms spin window covers this light endpoint's round-trip; timer cleaned up on unmount; initial version used setState-in-effect to watch generatedAt → lint react-hooks/set-state-in-effect error → refactored to timer approach)
+   763→- app-header.tsx wire-in only: removed 100-line NotificationsPopover + dead imports (Bell/AlertTriangle/CheckCircle2/useEffect/useState/DashboardData/Product); <NotificationBell /> in same slot (ghost icon size-10, same aria pattern, tooltip not present before/after); dark toggle/search/New Sale/clock untouched
+   764→- Design decisions: one sale.groupBy(status) instead of two aggregates; lowStock ratio sort = closest-to-dry first; badge colors mirror section tones; mobile fit guaranteed by max-w-[calc(100vw-1rem)] + Radix collision avoidance (verified: left 38 / right 378 at 390px)
+   765→
+   766→Verification:
+   767→- bun run lint: 0 errors (1 pre-existing benign RHF warning in product-dialog.tsx); my 3 files clean (note: transient react-hooks/immutability error in PosView.tsx during the round was concurrent-agent 18-c's file — resolved by them, untouched by me); bunx tsc --noEmit: 0 errors in src/ (4 pre-existing in examples/ + skills/)
+   768→- curl cross-checks: GET /api/notifications → exact payload shape; today.sales/transactions/expenses (12100 / 4 / 0) MATCH /api/dashboard exactly (both re-checked after concurrent POS QA raised them from 6940/3); lowStock row matches /api/products?status=active spot check (Ballpoint Pen Pack (10) STA-002, stock 13 ≤ reorder 15, ratio 0.867, price ৳120); outOfStock 0 = stockValue.outOfStock 0; refundedToday 0 = dashboard refunds 0; openShift null → later live-picked up 18-c's QA shift
+   769→- agent-browser E2E (isolated session, 1280px): click bell → popover w/ real rows, aria-expanded=true, badge pill "1" ("Notifications — 1 active alert"); click low-stock row → lands #/inventory ("Inventory & Stock"), popover closed, focus back on bell; reopen → refetch fires (network log shows GET /api/notifications ×3); Refresh button → new request + "Refreshed 03:42 AM"→"03:43 AM" (generatedAt re-render) + animate-spin verified mid-flight; LIVE shift test: while 18-c QA held a shift open, popover showed "Shift open · 0m / by QA 18c Cashier" + badge 2 (1 low + 1 shift) = rows, Today row "৳12,220 · 5 sales · ৳0 expenses today"; Escape → closed + focusOnBell true; empty-state path SKIPPED (can't force: seeded low-stock item always present; noted as untested-but-code-reviewed)
+   770→- Mobile 390×844: popover 340px wide (≤366 required), fits (left 38 / right 378), badge visible, aria-labels intact; dark mode spot check (html.dark, popover tokens correct); screenshots /tmp/qa-notifications.png, /tmp/qa-notifications-mobile.png, /tmp/qa-notifications-dark.png
+   771→- dev.log: 21× GET /api/notifications all 200, no compile errors; one EADDRINUSE in log = concurrent agent restart collision (env noise, not mine); server found down once mid-round → restarted per runbook
+   772→- DATA HYGIENE: zero data mutations by me (no sales/shifts/expenses created; the open "QA 18c Cashier" shift belongs to concurrent agent 18-c)
+   773→
+   774→Stage Summary:
+   775→- Header bell is now a real notification center: GET /api/notifications (light 4-query aggregate, safe to poll) + NotificationBell (60s poll, refetch-on-open, severity badge, actionable rows deep-linking to products/inventory/pos/dashboard/sales, info-only Today row, refresh + Refreshed-at footer)
+   776→- Badge arithmetic: lowStock.length + outOfStock.length + (openShift?1:0) + (refundedToday>0?1:0), 9+ cap, red/amber/emerald severity; today milestones deliberately uncounted
+   777→- Files: NEW src/app/api/notifications/route.ts, NEW src/components/app/notification-bell.tsx, app-header.tsx (wire-in only). types.ts/views/shifts API/schema untouched; no new npm packages
+   778→- Known limitations: badge counts capped API arrays (≤8) so a >8-alert store under-reports badge vs true counts; manual-refresh spin is a fixed 900ms window (useApi silent refetch has no in-flight signal) — adequate for this endpoint; shift elapsed label only updates on poll/data change (≤60s staleness); empty state untested E2E (seed data always has 1 low-stock item)
+   779→- Observation for main agent (pre-existing, outside my file scope): dashboard recent-sales TABLE overflows horizontally at 390px (scrollWidth 452 with popover closed) — DashboardView table needs a scroll container on mobile
+   780→---
+   781→Task ID: 18-b
+   782→Agent: full-stack-developer
+   783→Task: Product image snapshots on sale lines (SaleItem.imageUrl) + 28px thumbnails in thermal receipt & sale detail
+   784→
+   785→Work Log:
+   786→- READ-ONLY research first: worklog (print-clone architecture), schema (SaleItem.imageUrl pre-pushed — untouched), types.ts (pre-added — untouched), sales route POST (itemRows built in tx from productMap), GET (include items → imageUrl flows free), receipt.tsx (ReceiptPaper shared by preview + body-portalled print clone), sale-detail.tsx items table, globals.css receipt print CSS (`printing-receipt` clone isolation; `*` rules force color #000/bg transparent/border #000 — img content + borders unaffected → images print, bg stays white), product-avatar.tsx (initials-fallback tile — NOT reused: legacy lines must show nothing, no gap), products/[id] route (imageUrl served on payloads), cart-panel.tsx (already shows size-8 ProductAvatar from live data — untouched, styling intentionally stays cart-scale)
+   787→- BACKEND src/app/api/sales/route.ts POST only: added `imageUrl: string | null` to the itemRows inline type + `imageUrl: product.imageUrl` in the row built from the server-loaded product (comment: snapshot at sale time; null for imageless products + legacy rows). `items: { create: itemRows }` persists it; POST response (`findUnique include items`) and GET payloads include it automatically. No zod change: saleItemSchema strips unknown client fields and imageUrl never comes from the client
+   788→- FRONTEND receipt.tsx: NEW LineThumb (28px, h-7 w-7, rounded border-black/40, object-cover shrink-0, onError→renders nothing, alt="" + aria-hidden, no lazy-load so the print clone always has the image ready, `print:grayscale` for thermal aesthetic); item lines wrapped `flex items-center gap-1.5` with inner `min-w-0 flex-1` block — when imageUrl absent the single flex child geometry is identical to the old plain-div layout (verified: legacy receipt first-line box unchanged, 0 imgs, no gap)
+   789→- FRONTEND sale-detail.tsx: NEW SaleItemThumb (32px size-8, rounded-md border theme token, object-cover, lazy, onError→nothing, decorative); Item cell wrapped `flex items-center gap-2` + `min-w-0` text block — absent → exact previous cell layout
+   790→- Dev-server note: POST /api/sales 500'd "Unknown argument productId" — root cause was a STALE in-process @prisma/client (dev server started 20:57, client regenerated 21:27 by the earlier schema push; Node-external package cache never reloads). Restarted dev server (documented setsid command) → healthy; fixed by restart, not code
+   791→
+   792→Verification:
+   793→- bun run lint: 0 errors (1 pre-existing benign RHF warning in product-dialog.tsx); bunx tsc --noEmit: 0 errors in src/ (only pre-existing skills/ errors remain)
+   794→- curl POST /api/sales (1 test sale only): STA-001 A4 Paper Rim (imageUrl data URI) + ELC-007 Android TV Box (no image), CASH, total ৳5,160 → 201; created payload + GET /api/sales both show STA-001 item imageUrl len=2343 (copied from product) and ELC-007 item null; older sales (0002/0003) still null
+   795→- agent-browser E2E /#/sales: new sale detail → 1 img 32×32 aria-hidden on STA-001 row, ELC-007 row hasImg=false; receipt dialog → 1 img 28×28 on STA-001 line, ELC-007 line hasImg=false, 0 overlapping spans with thumb box, next line left-aligns with thumb line; legacy sale INV-20260927-0002 (pre-change) → 0 imgs in detail + receipt, layout identical
+   796→- Print pipeline: body.printing-receipt + printToPDF → /tmp/qa-receipt-images.pdf = receipt-only page (no page chrome), pdfimages shows exactly ONE embedded 93×93 rgb image + rounded-corner smask at 300dpi (≈28px CSS) = the STA-001 thumbnail prints; paper bg #fff, body #fff on paper; no overlap (text extraction + geometry)
+   797→- Mobile 390px: sale detail scrollWidth 390 == innerWidth, thumb renders; dark mode spot check: receipt paper stays white with black/40 border, detail thumb uses theme border token (screenshots /tmp/qa-sale-detail-mobile-390.png, /tmp/qa-sale-detail-dark.png, /tmp/qa-receipt-dark.png, /tmp/qa-receipt-thumb.png, /tmp/qa-sale-detail-thumb.png)
+   798→- DATA HYGIENE: exactly ONE test sale created — INV-20260927-0004, id cmuiwxcn80001n2vg62y203he, STA-001 ×1 @৳560 + ELC-007 ×1 @৳4,600, total ৳5,160.00 CASH COMPLETED (earlier POST attempts all 500-rolled-back, nothing persisted); dev.log clean of app errors after restart (one benign EADDRINUSE from restart race)
+   799→
+   800→Stage Summary:
+   801→- New sales snapshot product.imageUrl into each SaleItem at POST time (server-side from the tx's loaded products); receipt lines render 28px thermal-scale thumbnails and sale-detail rows 32px thumbnails ONLY when the snapshot exists — legacy/imageless lines render nothing and are pixel-identical to before; images are decorative (aria-hidden, alt=""), broken URLs self-hide, print output keeps the clone-isolation pattern with thumbnails printing grayscale on white
+   802→- Files: src/app/api/sales/route.ts (POST snapshot only), src/components/views/sales/receipt.tsx, src/components/views/sales/sale-detail.tsx. Untouched as required: schema.prisma, types.ts, cart-panel.tsx, checkout-dialog.tsx, PosView, shifts/*, globals.css (print CSS needed no change)
+   803→- Known limitations: snapshots freeze the image at sale time (product image edits don't retro-apply — by design); imageUrl data URIs up to 300KB are duplicated per SaleItem row (DB size grows with image-heavy carts); print:grayscale is a progressive enhancement (printToPDF embeds RGB; thermal printers dither to B&W anyway); dev server must be restarted after any prisma client regen or API routes 500 on new fields (operational note, not code)
+   804→
+   805→---
+   806→Task ID: 18-a
+   807→Agent: full-stack-developer
+   808→Task: Shift history with persisted close snapshot + reprintable close report in Sales view
+   809→
+   810→Work Log:
+   811→- READ-ONLY research first: worklog round 10 (Task 17-c shift conventions), prisma/schema.prisma (Shift.totalsJson pre-pushed — untouched), src/lib/types.ts (Shift.totalsJson? + ShiftSnapshot pre-added — untouched), api/shifts routes + totals.ts, pos/shift-close-dialog.tsx (summary grid + body-class/clone print pattern), sales/x-report + z-report (report number styling), SalesView structure, use-api/api/api-utils/format.ts, globals.css printing-shift block; Shift table inspected (7 legacy rows, ALL totalsJson null)
+   812→- BACKEND src/app/api/shifts/[id]/close/route.ts: persists JSON.stringify({ totals, expensesPaid, variance, closedAt: closedAt.toISOString() } satisfies ShiftSnapshot) into totalsJson INSIDE the same db.shift.update that sets closedAt/countedCash/note; response shape unchanged (ShiftCloseResult — shift now simply carries the new totalsJson field); header comment documents backward compat (legacy rows keep null)
+   813→- BACKEND src/app/api/shifts/route.ts GET: DECISION — keep the response as plain { shifts: Shift[] } with totalsJson as the RAW string (Prisma findMany already returns the column; matches Shift.totalsJson in types.ts) and parse CLIENT-side via a defensive helper (try/catch JSON.parse + full shape check) in shift-history.tsx; a parallel snapshots Record was rejected as redundant. Only a contract comment added; limit clamp (≤50, default 20) untouched
+   814→- FRONTEND NEW src/components/views/sales/shift-history.tsx: ShiftHistoryDialog (max-w-2xl) → ShiftHistoryBody (useApi '/api/shifts?limit=20', mounted only while open) → rows newest-first: opened fmtDateTime, closed fmtDateTime + duration ('2h 05m' floored-minute helper; open shifts show duration-so-far), emerald "open" badge + "In progress" if somehow still open, cashier (User icon, italic "—" when null), opening float, counted cash (or "—"), note as truncate + title tooltip; variance badge from the parsed snapshot: emerald "+৳X over" / red "−৳X short" (U+2212 + abs) / muted "exact" / muted "—" + "No snapshot" for legacy (reprint hidden for null snapshots — kept honest, no reconstruction); per-shift aria-labelled "View report" button
+   815→- Reprint: second stacked Dialog (max-w-lg) renders the PERSISTED snapshot — tone-colored variance banner (Counted/Expected/Closed line) + SnapshotSummary mirroring shift-close-dialog's summary style (Stat tiles Transactions/Gross/Refunds/Net + Payments received block + emerald Cash drawer block with derived cash refunds + "not deducted" footnote) + Close/Print footer; hidden .shift-print-area clone (ShiftReportPaper: "Shift Report · Cash Close" header with "· reprint" marker, summary, counted/expected/variance block, note, footer). REUSED the existing body.printing-shift print CSS — same report layout, so globals.css was NOT touched
+   816→- parseSnapshot validation: all 8 totals keys + expensesPaid + variance must be finite numbers, closedAt must be a string; anything else (corrupt JSON, wrong shape, null) → treated as "No snapshot"
+   817→- SalesView wire-in (additive only): History lucide icon, shiftsOpen state, outline "Shift history" button between Z-Report and Export CSV in the PageHeader actions row, <ShiftHistoryDialog/> rendered next to Z/X dialogs — no restructure
+   818→- No schema/types changes, no new npm packages, no print CSS additions
+   819→
+   820→Verification:
+   821→- eslint on my 4 files: 0 problems; bunx tsc --noEmit: 0 errors in src/ (pre-existing examples//skills/ errors only). NOTE: full `bun run lint` currently reports 1 error in PosView.tsx (react-hooks/immutability — attemptCheckout accessed before declaration) + the pre-existing product-dialog.tsx RHF warning; BOTH belong to other agents' file sets (PosView is being modified by the parallel POS-shift-guard task this round) — not touched by me
+   822→- curl/fetch suite (bun script → :3000): open {openingFloat:300, openedBy:"QA Agent 18a"} → 201; close {countedCash:350} → 200 ShiftCloseResult keys {expensesPaid, shift, totals, variance}, variance +50, expectedDrawer 300 (float only, no sales in window), expensesPaid 0; shift.totalsJson in the response is a string that parses and matches top-level variance; GET /api/shifts?limit=50 → my closed shift carries a parseable snapshot (keys closedAt,expensesPaid,totals,variance; variance 50) while ALL legacy rows keep totalsJson null; re-close → 400 "Shift is already closed"; bogus id → 404 "Shift not found"; limit=100/abc/-3 → 200 with clamp intact
+   823→- agent-browser E2E (isolated session qa18a, 1280px): /#/sales → "Shift history" opens the dialog → rows newest-first; my shift shows emerald "+৳50.00 over" + Float ৳300.00 + Counted ৳350.00 + note line; the parallel agent's fresh close shows muted "exact" (bonus variant proof); 7 legacy rows show muted "—" + "No snapshot" + cashier "—"; View report opens the reprint dialog with the persisted numbers (VARIANCE +৳50.00 over banner, stat tiles, payments, drawer block, Expected ৳300.00); hidden .shift-print-area clone display:none verified with full paper text; Print click with spied window.print → printing-shift body class present during print, removed after, exactly 1 print call; Escape closes the reprint but keeps history open; second Escape closes history; EMPTY state verified via network-route mock ({"shifts":[]}) → "No shifts yet" EmptyState, unrouted afterwards
+   824→- Mobile 390×844: scrollWidth 390 == innerWidth (zero horizontal overflow) with dialog open. Screenshots: /tmp/qa-shift-history.png + /tmp/qa-shift-reprint.png (desktop), /tmp/qa-shift-history-mobile.png + /tmp/qa-shift-reprint-mobile.png, /tmp/qa-shift-history-dark.png + /tmp/qa-shift-reprint-dark.png. VLM QA on desktop/mobile/dark of both dialogs → all PASS (badges readable, no clipping/overlap, dark contrast good)
+   825→- dev.log: all shifts traffic 200/201 — including the parallel agent's open+close cycle hitting my updated close route successfully; only error lines are a transient EADDRINUSE at the very top of the log from a restart race between concurrently-working agents (server healthy after — all 200s); dev server was found down once mid-session and restarted per runbook (setsid bun run dev >> dev.log 2>&1 &)
+   826→- DATA HYGIENE: exactly ONE 18-a test shift remains (float 300 → counted 350 → variance +৳50 over, note "snapshot persistence test", snapshot persisted) — kept as consistent QA/demo data; a duplicate "response-shape capture" shift created during verification was deleted via Prisma (net zero); no sales/expenses mutated. NOTE: a parallel agent concurrently created its own QA shifts (one still open at my finish — their live test state, untouched by me)
+   827→
+   828→Stage Summary:
+   829→- Shift history is live end-to-end: every NEW close persists a ShiftSnapshot into Shift.totalsJson (same update as closedAt); GET /api/shifts keeps returning raw Shift[] (totalsJson as raw string, parsed client-side); Sales view → "Shift history" dialog lists the last 20 shifts with opened/closed/duration/cashier/float/counted + variance badges, and a reprint dialog renders the persisted snapshot with a working print path reusing printing-shift
+   830→- Legacy shifts (closed before snapshots existed) degrade honestly: "—" badge, "No snapshot" note, reprint disabled
+   831→- Files: src/app/api/shifts/[id]/close/route.ts (snapshot persist), src/app/api/shifts/route.ts (comment only), src/components/views/SalesView.tsx (additive wire-in), NEW src/components/views/sales/shift-history.tsx. globals.css, pos/*, types.ts, schema.prisma, shifts/current/route.ts, shifts/totals.ts all untouched
+   832→- Known limitations: no pagination in the dialog (last 20; API caps at 50); open-shift duration-so-far uses the client clock at fetch time (no live tick); snapshots are frozen close-time copies (later refunds do NOT retro-change printed reports — by design); reprint renders the close-report layout only (snapshot doesn't carry hourly/top-item Z-report extras); legacy shifts' counted/expected numbers exist on the row but no variance can be shown without the snapshot (honest "—")
+   833→- Environment notes: browser launches failed repeatedly at first (thread exhaustion while 4 parallel agent-browser sessions were active) — retry-with-backoff resolved it; bun fetch to the dev server intermittently ECONNRESETs while Turbopack recompiles a route (server still completes the request) — QA scripts used retry
+   834→
+   835→---
+   836→Task ID: 18-c
+   837→Agent: full-stack-developer
+   838→Task: POS checkout shift guard (no open shift → confirm → Start shift → auto-resume checkout) + shift-aware dashboard strip
+   839→
+   840→Work Log:
+   841→- READ-ONLY research first: worklog round 10 (shift feature), PosView (found all 3 checkout triggers: desktop CartPanel onCheckout, mobile cart-sheet onCheckout, F9 shortcut), cart-panel (Charge button → onCheckout prop), shift-bar/shift-open-dialog (IMPORT ONLY — onOpened(shift) fires before onOpenChange(false); content unmounts when closed so two instances never collide on ids/aria), checkout-dialog (untouched), DashboardView (strip wired as first child of the main fragment, above QuickActions/KPI grid), dashboard card patterns, use-api, types.ts ShiftCurrent, page.tsx hash→view sync (window.location.hash = '#/pos' → hashchange listener → setView)
+   842→- NEW src/components/views/pos/shift-guard-dialog.tsx — two-step guard: step 1 amber confirmation Dialog "No shift is open" (AlertTriangle in amber tile, explains drawer counting + cart stays intact; Cancel / primary "Start shift"); step 2 renders its OWN <ShiftOpenDialog> instance (shift-bar's instance independent — only one open at a time, Radix mounts closed content only). advancingRef distinguishes guard→form advance from a real abort; openedRef distinguishes form success (onOpened fired) from cancel → onAborted fired only on genuine back-outs. Cart never touched here
+   843→- PosView.tsx wire-in: all 3 checkout triggers funnel into ONE attemptCheckout() — fresh GET /api/shifts/current on every click (per spec, prefer on-click check over polling); shift open → setCheckoutOpen(true) as today; none → pendingCheckoutRef.current = true + guardOpen. Fetch failure = fail-open (checkout proceeds; soft process guard must not block sales). handleGuardShiftOpened: auto-resume — cart still has items → setTimeout 120ms → setCheckoutOpen(true) (lets open-shift dialog unmount first); cart emptied meanwhile → toast.info('Cart was cleared — nothing to check out'). handleGuardAborted clears the pending ref. attemptCheckout/handlers wrapped in useCallback and MOVED ABOVE the F9 keydown effect (react-hooks "accessed before declared" lint error otherwise); F9 effect deps now [attemptCheckout]. ShiftGuardDialog rendered beside CheckoutDialog. Checkout-dialog/cart-panel untouched (guard lives at the PosView trigger boundary)
+   844→- NEW src/components/views/dashboard/shift-strip.tsx — useApi GET /api/shifts/current pollMs 30s; renders NULL when !data?.shift (header keeps size, no empty card). Card: left emerald accent bar (absolute w-1), border-emerald-500/30 bg-emerald-500/5, dark: border-emerald-500/25 bg-emerald-500/[0.08]; pulsing emerald dot + "Shift open · {elapsed}" (30s tick, hydration-safe — exact shift-bar pattern: now only set from interval, card null until fetch resolves); "Cashier: {openedBy}" when present; <dl> stats — Transactions / Net sales / Cash / Expected drawer (Wallet icon), labels uppercase 10px, values font-semibold tabular-nums, title tooltips; grid-cols-2 gap on mobile → sm:flex; "Open POS" Button (size sm, outline, aria-label "Open POS terminal") → window.location.hash = '#/pos'; xl-only muted hint "End shift from the POS header to count the drawer."; role=region aria-label="Current cashier shift" (not role=status — avoids 30s poll re-announcements)
+   845→- DashboardView.tsx: one import + <ShiftStrip /> as first fragment child (above QuickActions) — additive, minimal diff
+   846→
+   847→Verification:
+   848→- bun run lint: 0 errors (1 pre-existing benign RHF warning in product-dialog.tsx); bunx tsc --noEmit: 0 errors in src/ (4 pre-existing only in examples/ + skills/)
+   849→- agent-browser E2E (fresh GET on every attempt): /#/pos → added Ballpoint Pen Pack (৳120) → Charge → guard dialog "No shift is open" → Cancel → cart intact (Charge ৳120.00 unchanged, no dialogs) → Charge again → Start shift → ShiftOpenDialog (float 500, cashier "QA 18c Cashier") → Open shift → toast "Shift opened · Drawer starts with ৳500.00 · QA 18c Cashier" AND checkout dialog AUTO-OPENED ("Take payment", Confirm ৳120.00) → Exact cash chip → Confirm → Sale INV-20260927-0005 completed ৳120.00 · 1 line item; POS chip showed open shift; GET /api/shifts/current: transactions 1, netSales 120, cashSales 120, expectedDrawer 620
+   850→- Dashboard strip: /#/dashboard → region "Current cashier shift" visible: "Shift open · 0m", "Cashier: QA 18c Cashier", TRANSACTIONS 1 / NET SALES ৳120.00 / CASH ৳120.00 / EXPECTED DRAWER ৳620.00 — all four cross-check EXACTLY against GET /api/shifts/current; "Open POS" click → URL http://localhost:3000/#/pos (hashchange → POS view, End-shift chip present)
+   851→- Shift close via POS End shift: counted 620 = expected → "Variance: ৳0.00 — exact" → Done → bar back to "Start shift"; /#/dashboard → strip GONE (0 matches); then POS add item + Charge → guard triggers again (expected after close) → Cancel
+   852→- Shift-open positive path cross-check: shift open (curl 201) → desktop Charge → straight to "Take payment" (guard skipped); mobile sheet Charge behaved identically
+   853→- Mobile 390×844: dashboard scrollWidth == 390 with strip in 2×2 stats wrap; guard dialog scrollWidth == 390 (fits); screenshots /tmp/qa-dashboard-strip-mobile.png, /tmp/qa-pos-guard-mobile.png. Dark spot checks: /tmp/qa-dashboard-strip-dark.png, /tmp/qa-dashboard-strip-mobile-dark.png, /tmp/qa-pos-guard-mobile-dark.png, /tmp/qa-pos-guard-dark.png (set media dark, no theme leakage). Desktop light: /tmp/qa-pos-guard.png, /tmp/qa-dashboard-strip.png
+   854→- Console/page errors: none across all flows. dev.log: only 200/201 shift+sale lines, compiles clean; NOTE: dev server was found DOWN mid-round (no bun process, log clean) → restarted detached per runbook (`setsid bun run dev >> dev.log 2>&1 &`), healthy since
+   855→- DATA HYGIENE: exactly 1 completed sale INV-20260927-0005 · ৳120.00 (Ballpoint Pen Pack ×1, CASH, paid exact) — the mandated flow sale; 3 new QA shifts all closed with counted = expected (500→620 exact, 100→100 exact, 250→250 exact; variance 0 each). Ends with NO open shift + POS cart cleared
+   856→
+   857→Stage Summary:
+   858→- Checkout is now shift-aware: with no open shift, every POS checkout entry point (desktop Charge, mobile cart-sheet Charge, F9) is intercepted by a confirmation guard offering "Start shift"; opening the shift through the guard auto-resumes the interrupted checkout if the cart still has items (else a toast), and the cart (items/discounts/customer/note) is guaranteed untouched while guarded. With a shift open, checkout behaves exactly as before (fresh per-click API check, no polling added)
+   859→- Dashboard gains a shift-aware strip: only visible while a shift is open, showing live elapsed, cashier, transactions, net sales, cash, expected drawer (30s poll) with a one-click jump to POS; disappears cleanly on close
+   860→- Files: NEW pos/shift-guard-dialog.tsx + NEW dashboard/shift-strip.tsx; modified PosView.tsx (guard wire-in) + DashboardView.tsx (strip wire-in). NOT touched: shift-bar/shift-open-dialog/shift-close-dialog, checkout-dialog internals, cart-panel, shifts API routes, types.ts, schema
+   861→- Known limitations: empty-cart-while-guarded auto-resume branch (toast path) verified by code review only — clearing the cart while a modal guard is open requires a second client, not reachable in single-session E2E; guard fail-opens if the shift status fetch itself errors (deliberate: soft process guard shouldn't block sales); auto-resume uses a 120ms unmount delay before opening checkout (Radix dialog hand-off); strip elapsed/poll ticks every 30s (label can lag up to 30s, same as shift-bar)
+   862→
+   863→Work Log — features shipped (parallel agents, disjoint file ownership):
+   864→1. SHIFT HISTORY + PERSISTED SNAPSHOTS (18-a): close route now persists JSON.stringify({totals, expensesPaid, variance, closedAt}) into Shift.totalsJson inside the same update that closes; GET /api/shifts returns raw strings parsed client-side (documented contract). NEW sales/shift-history.tsx — history dialog (last 20 newest-first cards: opened/closed, duration, cashier, float/counted, emerald "+৳X over" / red "−৳X short" / muted "exact" variance badges, "No snapshot" honesty for legacy shifts) + reprint dialog reusing printing-shift CSS via body-portalled clone; SalesView gained a "Shift history" button between Z-Report and Export CSV
+   865→2. PRODUCT IMAGES IN RECEIPTS (18-b): POST /api/sales snapshots product.imageUrl into each SaleItem row (server-side, zod untouched); receipt.tsx 28px + sale-detail.tsx 32px thumbnails (rounded, border, object-cover, self-hiding on broken URLs, print:grayscale, zero layout shift for legacy imageless lines); print-media PDF verified one embedded 93×93 image; OPERATIONAL NOTE: dev server must be restarted after prisma generate (stale in-memory client 500'd on new fields until restart)
+   866→3. POS SHIFT GUARD + DASHBOARD STRIP (18-c): NEW pos/shift-guard-dialog.tsx — all 3 checkout triggers (desktop Charge, mobile sheet Charge, F9) funnel into attemptCheckout() with a FRESH GET /api/shifts/current per click; no shift → amber guard (cart untouched) → Start shift auto-resumes checkout (120ms hand-off); fail-open on fetch error (never blocks a sale). NEW dashboard/shift-strip.tsx — renders nothing when no shift; emerald accent card with pulse dot + elapsed + cashier + Transactions/Net sales/Cash/Expected drawer + "Open POS" jump; DashboardView wire-in above KPIs
+   867→4. NOTIFICATION CENTER (18-d): NEW GET /api/notifications (4 parallel Prisma queries, Dhaka day window) → lowStock ≤8 ratio-sorted / outOfStock ≤8 / openShift / today{sales,transactions,expenses} / refundedToday; NEW app/notification-bell.tsx replaces the static bell — Popover with severity badge (red/amber/emerald, 9+ cap), tinted sections with deep-link rows (→ #/inventory, #/products, #/pos, #/dashboard, #/sales), BellOff empty state, 60s poll + refetch-on-open + spinning manual refresh, "Refreshed HH:MM" footer; today numbers cross-checked EXACT against /api/dashboard
+   868→
+   869→Work Log — styling polish (mandatory, main agent):
+   870→- Shift strip: entrance animation (animate-in fade-in slide-in-from-top-2 duration-300, plays when a shift opens) + tabular-nums on the elapsed line to stop width jitter
+   871→- Verified every new surface in dark mode (strip, guard, history, notifications) and at 390px (scrollWidth == 390 everywhere; popover 340px fits)
+   872→- Investigated a reported dashboard 390px overflow (scrollWidth 452) — NOT reproducible post-merge (transient mid-flight measurement during parallel work); elementFromPoint sweep found zero wide elements
+   873→
+   874→Verification (main agent):
+   875→- bun run lint: 0 errors (1 pre-existing benign RHF warning) — the transient PosView react-hooks/immutability error seen mid-round by 18-a was resolved by 18-c before completion; bunx tsc --noEmit: 0 errors in src/
+   876→- agent-browser merged-state E2E: 10-view sweep 0 console errors; notification popover opens with real rows (1 low-stock + today milestone) and deep-links; Shift history dialog renders 11 shifts with exact/+৳50 badges + View report; POS guard fires on Charge with no shift (cart intact, ৳560 preserved) and auto-resumes after opening; dashboard strip shows live totals matching /api/shifts/current exactly (৳800 float); dark + mobile spot checks clean
+   877→- QA self-test note: the strip/notifications update on a 30s/60s poll — when asserting after an external state change, either wait for the poll cycle or reload the page; synchronous DOM checks also race React flush (use delays)
+   878→
+   879→Stage Summary:
+   880→- Backend surface added: /api/notifications; Shift.totalsJson persistence on close; SaleItem.imageUrl snapshot on sale create
+   881→- Frontend added: shift-history.tsx (+SalesView button), shift-guard-dialog.tsx, shift-strip.tsx, notification-bell.tsx (+app-header wire-in), receipt/sale-detail thumbnails
+   882→- The shift lifecycle is now complete end-to-end: guard → open → live POS chip + dashboard strip → close w/ counted cash + variance → archived history with reprintable snapshot reports → header notifications surface shift + stock + daily signals
+   883→- Data delta: 2 test sales (INV-20260927-0004 ৳5,160 with image snapshot, INV-20260927-0005 ৳120) + several closed QA shifts in history; no open shift left; products/expenses untouched
+   884→
+   885→Known limitations / risks:
+   886→- Strip/notification freshness is poll-bound (30s/60s); a shift opened elsewhere appears on the dashboard up to 30s later (entrance animation smooths the pop-in)
+   887→- Legacy (pre-round-11) shifts show "No snapshot" — reprint disabled by design; badge caps at 8 items per section so >8 alerts under-report the count
+   888→- Receipt images are frozen snapshots (≤300KB data URI duplicated per SaleItem row); old sales have none
+   889→- Guard fail-opens on fetch failure (deliberate); empty-cart-while-guarded branch verified by code review only
+   890→
+   891→Recommended next phase:
+   892→- Shift-aware sales filtering (filter sales list by shift), shift CSV export from history, notification preferences/settings (mute categories), stocktake session persistence server-side, server-side multipart image upload, multi-user/auth pass (openedBy → real users)
+   893→

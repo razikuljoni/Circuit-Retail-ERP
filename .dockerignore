@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Circuit Retail ERP — Docker build-context guard
+#
+#  The build only needs: src/, public/, prisma/, scripts/, package.json,
+#  bun.lock, next.config.ts, tsconfig.json, postcss.config.mjs,
+#  tailwind.config.ts, components.json, eslint.config.mjs.
+#  Everything below is deliberately kept OUT of the context so builds stay
+#  small and cache-friendly and never leak secrets or live shop data.
+#  (Nothing above that list is matched by any rule here.)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Version control & CI
+.git
+.github
+.gitignore
+
+# Dependencies & build output — rebuilt inside the image
+node_modules
+.next
+
+# Live data & backups — NEVER bake into an image layer
+# (db/custom.db, backups/, dev.log & server.log via the *.log rule)
+db
+backups
+*.log
+
+# Secrets & env files (.env.example is intentionally kept — it's the
+# documented template, harmless, and referenced by the compose quick start)
+.env
+.env.*
+!.env.example
+
+# Sandbox / deployment leftovers not used by the build
+Caddyfile
+worklog.md
+PLAN.md
+.claude
+.z-ai-config
+.dash.json
+.task4-dashboard.png
+
+# Sandbox helper dirs — also excluded by tsconfig, imported by nothing in src/
+skills
+examples
+tests
+download
+tool-results
+agent-ctx
+mini-services
+
+# Bun's compiled lockfile variant (this repo ships the text bun.lock — DO
+# NOT add bun.lock here; the frozen install depends on it)
+bun.lockb

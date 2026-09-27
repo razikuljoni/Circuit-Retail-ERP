@@ -1,0 +1,94 @@
+# CI — quality gate for every push to main and every pull request.
+#
+# Pipeline: install → lint → typecheck → Prisma schema sync → production build
+# → upload the self-assembled standalone bundle as a downloadable artifact.
+#
+# Why this shape:
+# - `bun run typecheck` (tsc --noEmit) is green project-wide, but the real
+#   gate is `next build`, which type-checks every route/page with
+#   ignoreBuildErrors NOT set — a broken import or type error fails the build.
+# - `db:push` against a throwaway SQLite file proves the Prisma schema is
+#   valid and pushable from a clean slate (catches malformed models before
+#   a deploy does).
+# - The uploaded `next-standalone` artifact can be downloaded and run
+#   manually (`bun .next/standalone/server.js`) for smoke-testing a PR
+#   without Docker.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One run per ref: supersede in-progress runs on the same branch/PR to
+# save minutes (only the latest state matters).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Schema · Build
+    runs-on: ubuntu-latest
+    steps:
+      # Pin @v4: stable major tag, full git history not needed for these gates.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Installs Bun ≥ 1.2 (satisfies the `engines` constraint in package.json)
+      # so bun.lock and all `bun run` scripts behave exactly as locally.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # --frozen-lockfile: CI must build with EXACTLY the versions locked in
+      # bun.lock — no silent dependency drift. The package.json `postinstall`
+      # hook runs `prisma generate` automatically, producing the typed
+      # Prisma client needed by the typecheck and build steps below.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ESLint over the repo (flat config). Fails on errors; warnings pass.
+      - name: Lint
+        run: bun run lint
+
+      # Project-wide TypeScript check (tsconfig excludes skills/examples/
+      # tests/download/tool-results/agent-ctx, so this is fully green when
+      # healthy). Fast feedback before the slower build below.
+      - name: Typecheck
+        run: bun run typecheck
+
+      # Throwaway SQLite database — /tmp/ci.db is ephemeral, never committed.
+      # Proves `prisma db push` succeeds from a clean slate (schema is valid,
+      # pushable, and in sync with the checked-in schema.prisma). No data is
+      # seeded; nothing at build time connects to this file, but the env var
+      # is provided because the Prisma datasource requires DATABASE_URL to be
+      # resolvable.
+      - name: Sync Prisma schema to throwaway SQLite database
+        run: bun run db:push
+        env:
+          DATABASE_URL: file:/tmp/ci.db
+
+      # Production build — the strongest gate in this pipeline. Next.js
+      # type-checks all app routes here (no ignoreBuildErrors), then the
+      # `build` script self-assembles the standalone bundle by copying
+      # .next/static and public/ into .next/standalone/. A failure here means
+      # the release workflow (release.yml) would also fail — stop it early.
+      - name: Production build (standalone bundle)
+        run: bun run build
+        env:
+          DATABASE_URL: file:/tmp/ci.db
+
+      # Publish the runnable standalone output (server.js + static + public)
+      # so maintainers can download it from the run page and smoke-test the
+      # exact bundle CI validated — no Docker required. Kept 7 days: long
+      # enough to review a PR, short enough not to hoard storage.
+      - name: Upload standalone bundle artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-standalone
+          path: .next/standalone/
+          retention-days: 7

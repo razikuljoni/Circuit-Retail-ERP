@@ -50,5 +50,11 @@ test
 prompt
 
 server.log
+
+# local SQLite backups created by `bun run backup`
+/backups/
+*.db.bak
+*.db.bak-*
+
 # Skills directory
 /skills/

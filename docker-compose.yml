@@ -1,0 +1,56 @@
+# ────────────────────────────────────────────────────────────────────────────
+#  Circuit Retail ERP — production compose stack
+#
+#  Quick start:
+#    cp .env.example .env        # adjust SEED_TOKEN / APP_PORT as needed
+#    docker compose up -d --build
+#    curl http://localhost:3000/api/health   # → {"status":"ok",...}
+#
+#  Compose auto-reads the .env file next to this file for interpolation:
+#    - APP_PORT            host port (the container always listens on 3000)
+#    - SEED_TOKEN          enables POST /api/seed in production
+#                          (requests must send it as the `x-seed-token` header;
+#                          leave empty to keep seeding disabled)
+#    - NEXT_PUBLIC_APP_URL public origin used for SEO/OG metadata (server-side
+#                          reads see it at runtime; any client-bundle inlining
+#                          happens at BUILD time — rebuild the image if you
+#                          change a NEXT_PUBLIC_* value)
+#    Note: DATABASE_URL is NOT taken from .env — the stack pins it to the
+#    mounted volume path (file:/app/db/custom.db) below.
+#
+#  Data lives in two named volumes that survive restarts and rebuilds:
+#    app-db       → /app/db      (SQLite database file)
+#    app-backups  → /app/backups (operator backups)
+# ────────────────────────────────────────────────────────────────────────────
+
+name: circuit-retail-erp
+
+services:
+  app:
+    build: .
+    image: circuit-retail-erp:latest
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: "production"
+      # SQLite lives on the named volume, not inside the container layer.
+      DATABASE_URL: "file:/app/db/custom.db"
+      SEED_TOKEN: "${SEED_TOKEN:-}"
+      NEXT_PUBLIC_APP_URL: "${NEXT_PUBLIC_APP_URL:-http://localhost:${APP_PORT:-3000}}"
+    volumes:
+      - app-db:/app/db
+      - app-backups:/app/backups
+    healthcheck:
+      # node:22-slim ships no curl/wget → use Node's built-in fetch.
+      # /api/health returns 200 when app + database are healthy, 503 when
+      # degraded (DB down) — r.ok only passes on 2xx.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  app-db:
+  app-backups:

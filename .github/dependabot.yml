@@ -1,0 +1,15 @@
+# Dependabot version updates.
+#
+# NOTE ON BUN: although this project installs dependencies with Bun,
+# Dependabot understands the bun.lock manifest — the `npm` ecosystem below
+# resolves and updates packages against bun.lock, so PRs stay compatible
+# with `bun install --frozen-lockfile` (a Dependabot PR refreshes the
+# lockfile itself).
+version: 2
+updates:
+  - package-ecosystem: "npm" # covers bun.lock manifests
+    directory: "/" # package.json + bun.lock live at the repo root
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
