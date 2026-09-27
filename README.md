@@ -2,6 +2,8 @@
 
 > Production-ready retail operations suite — POS invoicing, inventory & stock ledger, expenses, and a live daily sales dashboard. Built for Dhaka-time (UTC+6) retail.
 
+🌐 **Live Demo**: [https://circuit-retail-erp.vercel.app](https://circuit-retail-erp.vercel.app)
+
 ![CI](https://github.com/razikuljoni/Circuit-Retail-ERP/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![pnpm](https://img.shields.io/badge/pnpm-%E2%89%A59.0-orange)
